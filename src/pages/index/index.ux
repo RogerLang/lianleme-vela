@@ -108,7 +108,7 @@ import protocol from '../../common/workout-protocol.js'
 var PLAN_KEY = 'lianleme.workout.plan.v1'
 var STATE_KEY = 'lianleme.workout.state.v3'
 var STATE_VERSION = 3
-var APP_VERSION = '0.3.0'
+var APP_VERSION = '0.3.1'
 
 var DEMO_WORKOUT = {
   id: '',
@@ -235,6 +235,7 @@ export default {
     nextPrescription: '',
     restTimer: null,
     connectionReady: false,
+    connectionDiagnosis: -1,
     connectionLabel: '离线',
     doneNote: '记录保存在手环，连接后同步'
   },
@@ -248,7 +249,11 @@ export default {
       return
     }
     this.resumeFromLifecycle()
-    this.sendHelloAndProgress()
+    if (this.connectionReady) {
+      this.sendHelloAndProgress()
+    } else {
+      this.diagnoseConnection()
+    }
   },
 
   onHide() {
@@ -441,37 +446,84 @@ export default {
     }
     conn.onopen = function() {
       that.connectionReady = true
+      that.connectionDiagnosis = 0
       that.refreshConnectionLabels()
       that.sendHelloAndProgress()
     }
-    conn.onclose = function() {
+    conn.onclose = function(data) {
       that.connectionReady = false
+      that.connectionDiagnosis = data && typeof data.code === 'number' ? data.code : 1006
       that.refreshConnectionLabels()
     }
     conn.onerror = function(data) {
       that.connectionReady = false
+      that.connectionDiagnosis = data && typeof data.code === 'number' ? data.code : 1000
       that.refreshConnectionLabels()
       console.log('Vela interconnect error: ' + (data && data.code))
+      that.diagnoseConnection()
     }
 
     conn.getReadyState({
       success: function(data) {
         that.connectionReady = !!data && data.status === 1
+        that.connectionDiagnosis = that.connectionReady ? 0 : 1006
         that.refreshConnectionLabels()
         if (that.connectionReady) {
           that.sendHelloAndProgress()
+        } else {
+          that.diagnoseConnection()
         }
       },
       fail: function(data, code) {
         that.connectionReady = false
+        that.connectionDiagnosis = typeof code === 'number' ? code : 1000
         that.refreshConnectionLabels()
         console.log('Vela interconnect state failed: ' + code)
+        that.diagnoseConnection()
+      }
+    })
+  },
+
+  diagnoseConnection() {
+    var that = this
+    if (!this.conn || typeof this.conn.diagnosis !== 'function') {
+      return
+    }
+    this.conn.diagnosis({
+      timeout: 4000,
+      success: function(data) {
+        var status = data && typeof data.status === 'number' ? data.status : 1000
+        that.connectionDiagnosis = status
+        that.connectionReady = status === 0
+        that.refreshConnectionLabels()
+        if (that.connectionReady) {
+          that.sendHelloAndProgress()
+        }
+        console.log('Vela interconnect diagnosis: ' + status)
+      },
+      fail: function(data, code) {
+        that.connectionReady = false
+        that.connectionDiagnosis = typeof code === 'number' ? code : 1000
+        that.refreshConnectionLabels()
+        console.log('Vela interconnect diagnosis failed: ' + code)
       }
     })
   },
 
   refreshConnectionLabels() {
-    this.connectionLabel = this.connectionReady ? '手机已连' : '离线'
+    if (this.connectionReady) {
+      this.connectionLabel = '手机已连'
+    } else if (this.connectionDiagnosis === 204) {
+      this.connectionLabel = '连接超时'
+    } else if (this.connectionDiagnosis === 1001) {
+      this.connectionLabel = '手机未匹配'
+    } else if (this.connectionDiagnosis === 1000) {
+      this.connectionLabel = '互联异常'
+    } else if (this.connectionDiagnosis === 1006) {
+      this.connectionLabel = '连接断开'
+    } else {
+      this.connectionLabel = '离线'
+    }
     this.doneNote = this.connectionReady ? '训练记录已发送到手机' : '记录保存在手环，连接后同步'
   },
 
