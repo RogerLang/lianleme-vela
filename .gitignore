@@ -1,8 +1,8 @@
 node_modules/
+build/
 dist/
 sign/
 src/common/icon.png
 *.log
 .DS_Store
-.vscode/mcp.json
 .vscode/mcp.json

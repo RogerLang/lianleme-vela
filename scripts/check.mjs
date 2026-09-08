@@ -37,7 +37,7 @@ if (manifest.icon !== "/common/icon.png") fail("Vela manifest icon must remain /
 if (!Array.isArray(manifest.deviceTypeList) || !manifest.deviceTypeList.includes("watch")) fail("Vela deviceTypeList must include watch");
 if (manifest.config?.designWidth !== 336) fail("Vela designWidth must remain 336 for Xiaomi Smart Band 9 Pro");
 if (Number(manifest.minPlatformVersion || 0) < 1200) fail("system.interconnect baseline requires minPlatformVersion 1200 in the Xiaomi demo baseline");
-for (const featureName of ["system.vibrator", "system.storage", "system.interconnect"]) {
+for (const featureName of ["system.vibrator", "system.storage", "system.interconnect", "system.app"]) {
   if (!Array.isArray(manifest.features) || !manifest.features.some(feature => feature?.name === featureName)) {
     fail(`Vela manifest must declare ${featureName}`);
   }
@@ -50,11 +50,12 @@ if (!packageJson.devDependencies?.["aiot-toolkit"]) fail("Vela aiot-toolkit depe
 if (!packageJson.devDependencies?.["@aiot-toolkit/jsc"]) fail("Vela JSC dependency is missing");
 
 const ignore = read(ignorePath);
-for (const required of ["node_modules", "dist", "src/common/icon.png"]) {
+for (const required of ["node_modules", "build", "dist", "src/common/icon.png"]) {
   if (!ignore.includes(required)) fail(`Vela .gitignore must ignore ${required}`);
 }
 
 if (!page.includes("@system.interconnect")) fail("Vela workout page must import system.interconnect");
+if (!page.includes("@system.app")) fail("Vela workout page must import system.app");
 if (!protocol.includes("lianleme.workout") || !protocol.includes("VERSION = 1")) fail("Workout Protocol V1 marker is missing");
 
 for (const publicText of [page, protocol, exists(specPath) ? read(specPath) : ""]) {
