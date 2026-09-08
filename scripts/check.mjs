@@ -60,7 +60,18 @@ for (const required of ["node_modules", "build", "dist", "src/common/icon.png"])
 if (!page.includes("@system.interconnect")) fail("Vela workout page must import system.interconnect");
 if (!page.includes("@system.app")) fail("Vela workout page must import system.app");
 if (!protocol.includes("lianleme.workout") || !protocol.includes("VERSION = 1")) fail("Workout Protocol V1 marker is missing");
-for (const marker of ["applyIncomingProgress", "progress-ack", "syncPending"]) {
+for (const marker of [
+  "applyIncomingProgress",
+  "progress-ack",
+  "syncPending",
+  "pendingPlan",
+  "tryApplyPendingPlan",
+  "sendPlanAck",
+  "status: status || 'accepted'",
+  "'deferred'",
+  "'active-session'",
+  "'sync-pending'"
+]) {
   if (!page.includes(marker)) fail(`bidirectional wearable sync marker missing: ${marker}`);
 }
 for (const marker of ["normalizeProgress", "progressMatchesPlan", "actualRir"]) {
@@ -73,7 +84,7 @@ const rirRowCount = (page.match(/class="rir-row"/g) || []).length;
 if (rirRowCount !== 3) fail(`wearable RIR picker must have exactly 3 rows, found ${rirRowCount}`);
 const rirButtonCount = (page.match(/class="rir-button"/g) || []).length;
 if (rirButtonCount !== 6) fail(`wearable RIR picker must have exactly 6 buttons, found ${rirButtonCount}`);
-for (const marker of ["progress` — either direction", "progress-ack", "syncPending", "actualRir"]) {
+for (const marker of ["progress` — either direction", "progress-ack", "syncPending", "actualRir", "deferred", "pending plan"]) {
   if (!spec.includes(marker)) fail(`Workout Protocol V1 documentation marker missing: ${marker}`);
 }
 

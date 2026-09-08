@@ -167,7 +167,7 @@ import protocol from '../../common/workout-protocol.js'
 var PLAN_KEY = 'lianleme.workout.plan.v1'
 var STATE_KEY = 'lianleme.workout.state.v3'
 var STATE_VERSION = 3
-var APP_VERSION = '0.4.1'
+var APP_VERSION = '0.4.2'
 
 var DEMO_WORKOUT = {
   id: '',
@@ -306,6 +306,8 @@ export default {
     syncPending: false,
     progressUpdatedAt: 0,
     lastAckUpdatedAt: 0,
+    pendingPlan: null,
+    pendingPlanReplyTo: '',
     doneStatusTitle: '已保存在手环',
     doneStatusDetail: '连接后自动同步'
   },
@@ -642,7 +644,7 @@ export default {
       return
     }
     if (message.type === 'plan') {
-      this.applyIncomingPlan(message.payload)
+      this.applyIncomingPlan(message.payload, message.id)
       return
     }
     if (message.type === 'progress') {
@@ -671,6 +673,7 @@ export default {
     }
     this.refreshDoneStatus()
     this.saveState()
+    this.tryApplyPendingPlan()
   },
 
   applyIncomingProgress(payload) {
@@ -747,6 +750,7 @@ export default {
       planId: String(WORKOUT.planId || ''),
       updatedAt: this.progressUpdatedAt
     })
+    this.tryApplyPendingPlan()
   },
 
   firstIncompleteIndices(completed) {
@@ -761,34 +765,74 @@ export default {
     return null
   },
 
-  applyIncomingPlan(payload) {
-    var plan = protocol.normalizePlan(payload)
-    if (!plan || !plan.id || !plan.revision) {
-      return
-    }
+  hasActiveLocalSession() {
+    return (this.completedRecords.length > 0 || this.screen === 'rir') && this.screen !== 'complete'
+  },
 
-    var same = protocol.samePlan(WORKOUT, plan)
-    var activeLocalSession = (this.completedRecords.length > 0 || this.screen === 'rir') && this.screen !== 'complete'
-    var unsyncedLocalSession = this.syncPending && WORKOUT.id && WORKOUT.revision
-    if (!same && (activeLocalSession || unsyncedLocalSession)) {
-      this.publishProgress()
-      return
-    }
+  sendPlanAck(plan, status, replyTo, reason) {
+    this.sendEnvelope('ack', {
+      replyTo: String(replyTo || ''),
+      workoutId: String(plan && plan.id || ''),
+      revision: String(plan && plan.revision || ''),
+      status: status || 'accepted',
+      reason: reason || '',
+      currentWorkoutId: String(WORKOUT.id || ''),
+      currentRevision: String(WORKOUT.revision || '')
+    })
+  },
 
-    if (same) {
-      if (this.syncPending) {
-        this.publishProgress()
-      }
-      return
-    }
-
+  installIncomingPlan(plan, replyTo) {
+    this.pendingPlan = null
+    this.pendingPlanReplyTo = ''
     WORKOUT = plan
     this.persistPlan()
     this.totalSets = countSets()
     this.resetWorkoutState()
     this.saveState()
     vibrator.vibrate({ mode: 'short' })
-    this.sendEnvelope('ack', { workoutId: WORKOUT.id, revision: WORKOUT.revision })
+    this.sendPlanAck(plan, 'accepted', replyTo, '')
+  },
+
+  tryApplyPendingPlan() {
+    if (!this.pendingPlan) {
+      return false
+    }
+    var unsyncedLocalSession = this.syncPending && WORKOUT.id && WORKOUT.revision
+    if (this.hasActiveLocalSession() || unsyncedLocalSession) {
+      return false
+    }
+    var plan = this.pendingPlan
+    var replyTo = this.pendingPlanReplyTo
+    this.installIncomingPlan(plan, replyTo)
+    return true
+  },
+
+  applyIncomingPlan(payload, replyTo) {
+    var plan = protocol.normalizePlan(payload)
+    if (!plan || !plan.id || !plan.revision) {
+      return
+    }
+
+    var same = protocol.samePlan(WORKOUT, plan)
+    if (same) {
+      this.sendPlanAck(plan, 'accepted', replyTo, '')
+      if (this.syncPending) {
+        this.publishProgress()
+      }
+      return
+    }
+
+    var activeLocalSession = this.hasActiveLocalSession()
+    var unsyncedLocalSession = this.syncPending && WORKOUT.id && WORKOUT.revision
+    if (activeLocalSession || unsyncedLocalSession) {
+      this.pendingPlan = plan
+      this.pendingPlanReplyTo = String(replyTo || '')
+      this.sendPlanAck(plan, 'deferred', replyTo, activeLocalSession ? 'active-session' : 'sync-pending')
+      this.publishProgress()
+      return
+    }
+
+    this.installIncomingPlan(plan, replyTo)
   },
 
   resumeFromLifecycle() {
@@ -1180,7 +1224,11 @@ export default {
       }
       vibrator.vibrate({ mode: 'short' })
     }
+    var that = this
     setTimeout(function() {
+      if (that.screen !== 'complete') {
+        return
+      }
       try {
         app.terminate()
       } catch (error) {
