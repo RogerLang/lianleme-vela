@@ -76,17 +76,16 @@ jobs:
           cat > release-notes.md <<EOF
           ## 练了么 Vela ${VERSION}
 
-          Xiaomi Smart Band 9 Pro 真机验收版本。
+          自动签名构建归档。
 
-          - 双向手机 ↔ 手环训练进度同步
-          - 断连训练与重连补发
-          - 训练、调整、休息、完成全流程
-          - 震动反馈与完成退出
-          - 圆形 Launcher 图标
+          - Vela CI 已通过
+          - 正式签名 RPK 已生成
           - Workout Protocol V1
           - 与 Android 正式 APK 使用同一签名身份
 
           下载 Assets 中的 RPK 文件即可长期保存或重新安装。signing-certificate.txt 用于核对签名证书指纹。
+
+          Xiaomi Smart Band 9 Pro 的布局、震动、退出、离线恢复和手机互联仍需以实际设备验收结果为准。
           EOF
 
           gh release create "$TAG" \
@@ -94,7 +93,7 @@ jobs:
             release-assets/signing-certificate.txt \
             --repo "$GITHUB_REPOSITORY" \
             --target "$TARGET_SHA" \
-            --title "练了么 Vela ${VERSION} · Final" \
+            --title "练了么 Vela ${VERSION}" \
             --notes-file release-notes.md
 
       - name: Release already exists

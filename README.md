@@ -4,30 +4,34 @@
 
 ## 当前基线
 
-当前真机验收基线为 0.4.0：
+当前源码与签名发布基线为 0.4.1：
 
 ```text
-versionName 0.4.0
-versionCode 14
+versionName 0.4.1
+versionCode 15
 package io.github.rogerlang.lianleme
 minPlatformVersion 1200
 ```
 
-0.4.0 已完成 Xiaomi Smart Band 9 Pro 真机验证，覆盖训练页、调整页、休息页、训练结束页、震动反馈、退出流程、手机 ↔ 手环 Workout Protocol V1 双向进度同步，以及圆形 Launcher 图标。包名与 Android `io.github.rogerlang.lianleme` 对齐，用于 Xiaomi `system.interconnect` 身份匹配。0.2.5 及更早版本使用 `com.rogerlang.lianleme.vela`，首次迁移到当前包名时需要先卸载旧包。
+0.4.1 在 0.4.0 已完成真机验证的训练、调整、休息、完成、震动、退出、双向同步和 Launcher 图标能力上增加 RIR 记录：普通工作组完成后选择 RIR 0–5，并通过 Workout Protocol V1 的可选 `actualRir` 字段与 Android 同步。0.4.1 已通过仓库 CI、签名 RPK 构建和长期 Release 归档；新增 RIR 流程的最终真机验收仍以 Xiaomi Smart Band 9 Pro 实测为准。
+
+0.4.0 是上一版已完成 Xiaomi Smart Band 9 Pro 全流程真机验证的基线。包名与 Android `io.github.rogerlang.lianleme` 对齐，用于 Xiaomi `system.interconnect` 身份匹配。0.2.5 及更早版本使用 `com.rogerlang.lianleme.vela`，首次迁移到当前包名时需要先卸载旧包。
 
 公开仓库不保存个人训练计划、训练记录、GitHub Token、Android keystore 或 PEM 私钥。
 
 ## 长期下载
 
-0.4.0 作为当前 Final 基线发布到 GitHub Releases。Release Assets 中的签名 `.rpk` 用于长期保存与重新安装，不受 Actions artifact 保留时间影响；同时附带 `signing-certificate.txt` 供签名指纹核对。
+每个首次出现且完成 `Vela CI → Signed Vela RPK` 的版本会自动归档到 GitHub Releases。Release Assets 中的签名 `.rpk` 用于长期保存与重新安装，不受 Actions artifact 保留时间影响；同时附带 `signing-certificate.txt` 供签名指纹核对。
 
-后续若产生新版本，只有版本号首次出现并完成 `Vela CI → Signed Vela RPK` 后才会创建对应 GitHub Release；已有版本不会被后续构建覆盖。
+自动 Release 表示该 commit 已通过 CI 并生成正式签名 RPK。真机验收状态以 README 中的当前基线说明和实际设备测试结果为准。已有版本不会被后续同版本构建覆盖。
 
 ## 当前功能
 
 - 当前动作、组进度、重量和次数展示
 - 双列主操作按钮
 - 完成本组
+- 普通工作组完成后记录 RIR 0–5
+- 热身组跳过 RIR 记录
 - 独立重量 / 次数调整页
 - 组间休息倒计时
 - `−15 秒 / +15 秒`
@@ -36,7 +40,7 @@ minPlatformVersion 1200
 - 训练结束页撤销最后一组
 - 训练完成后保存最终状态并退出应用
 - 未同步完成记录保存在手环，连接后继续补发
-- 本地状态恢复
+- 本地状态恢复，包括 RIR 选择页恢复
 - 演示训练完成确认后，下次启动自动回到第 1 组
 - 绝对时间休息校时
 - 完成组、休息结束与训练完成震动反馈
@@ -44,6 +48,7 @@ minPlatformVersion 1200
 - 从 Android 接收并持久化 Planned Workout
 - 手环完成组、撤销、完成训练后回传 progress snapshot
 - 手机端进度变化同步回手环，并回传 `progress-ack`
+- `actualRir` 作为可选进度字段双向同步
 - 断连期间继续训练，连接恢复后补发当前 progress snapshot
 
 如果手机端暂时没有可用计划，手环保留公开演示计划作为开发 fallback。
@@ -59,6 +64,7 @@ V1 采用 workout / progress 快照：
 - 手环本地保存 plan 与训练进度。
 - 手环关键训练变化后发送 `progress`。
 - 手机训练进度变化后也可发送 `progress`，手环更新到对应组状态。
+- 普通工作组可在 `completedRecords` 中附带可选 `actualRir`。
 - 接收端应用有效 progress 后发送 `progress-ack`。
 - 重新连接时再次交换当前 progress，补齐断连期间的数据。
 - 双方只处理与当前 `workoutId + revision` 一致的进度。
@@ -116,13 +122,14 @@ designWidth 336
 
 - Signed Vela RPK 成功后读取当前版本号。
 - 若对应 `v<version>` Release 尚未存在，下载刚生成的签名 RPK 并创建永久 GitHub Release。
+- 自动 Release 只声明 CI 与正式签名包归档状态，不自动声明真机验收完成。
 - 已经发布过的版本保持原有归档，不会被后续同版本构建替换。
 
 Xiaomi 互联要求 Vela 与 Android 同包名、同签名。普通 debug RPK 可以验证构建和 UI；实际手机 ↔ 手环互联测试应使用同签名 RPK。
 
 ## 维护与发布流程
 
-0.4.0 已作为当前真机基线。后续功能修改继续通过分支、PR、CI、自动签名包的流程进入 `main`，避免直接在已验收基线上做未检查修改。
+后续功能修改继续通过分支、PR、CI、自动签名包的流程进入 `main`，避免直接在已验证基线上做未检查修改。
 
 ```text
 PR / main 变更
@@ -131,13 +138,14 @@ PR / main 变更
 → Signed Vela RPK 自动构建
 → 首次版本自动归档到 GitHub Release
 → 真机安装并完成全流程测试
+→ 更新真机验收状态
 ```
 
 ## 数据边界
 
 手机端负责 Template、Candidate Workout、Planned Workout、WorkoutSession、Session、GitHub 同步和长期数据。
 
-手环端负责训练期间显示、完成组、临时调整、休息提醒、本地恢复和离线 progress snapshot。
+手环端负责训练期间显示、完成组、RIR、临时调整、休息提醒、本地恢复和离线 progress snapshot。
 
 手环不直接访问 GitHub，不复制手机端完整 IndexedDB 数据模型。
 
