@@ -26,17 +26,6 @@ function fillCanvas(color) {
   }
 }
 
-function fillCircle(cx, cy, radius, color) {
-  const r2 = radius * radius;
-  for (let y = cy - radius; y <= cy + radius; y++) {
-    for (let x = cx - radius; x <= cx + radius; x++) {
-      const dx = x - cx;
-      const dy = y - cy;
-      if (dx * dx + dy * dy <= r2) setPixel(x, y, ...color);
-    }
-  }
-}
-
 function fillRoundedRect(x, y, width, height, radius, color) {
   const right = x + width - 1;
   const bottom = y + height - 1;
@@ -56,11 +45,12 @@ function s(value) {
   return Math.round(value * SCALE);
 }
 
-fillCanvas([0, 0, 0, 255]);
-fillCircle(s(96), s(96), s(76), [246, 248, 251, 255]);
-fillRoundedRect(s(48), s(60), s(72), s(18), s(6), [91, 154, 222, 255]);
-fillRoundedRect(s(48), s(87), s(88), s(18), s(6), [62, 124, 201, 255]);
-fillRoundedRect(s(48), s(114), s(104), s(18), s(6), [43, 96, 174, 255]);
+// Vela launchers apply their own icon mask. Keep the 192x192 artwork full-bleed
+// so the masked icon matches the visual diameter of neighboring system icons.
+fillCanvas([246, 248, 251, 255]);
+fillRoundedRect(s(44), s(58), s(78), s(20), s(7), [91, 154, 222, 255]);
+fillRoundedRect(s(44), s(86), s(96), s(20), s(7), [62, 124, 201, 255]);
+fillRoundedRect(s(44), s(114), s(112), s(20), s(7), [43, 96, 174, 255]);
 
 const downsampled = Buffer.alloc(SIZE * SIZE * 4, 0);
 for (let y = 0; y < SIZE; y++) {
