@@ -1,0 +1,16 @@
+{
+  "name": "lianleme-vela-band-app",
+  "version": "0.2.5",
+  "private": true,
+  "scripts": {
+    "icon": "node scripts/generate-icon.mjs",
+    "check": "npm run icon && node scripts/check.mjs",
+    "start": "npm run icon && aiot start --watch",
+    "build": "npm run icon && aiot build",
+    "release": "npm run icon && aiot release"
+  },
+  "devDependencies": {
+    "@aiot-toolkit/jsc": "1.0.9",
+    "aiot-toolkit": "2.0.5"
+  }
+}
