@@ -111,15 +111,19 @@
         <div class="done-mark-box"><text class="done-mark">✓</text></div>
         <text class="done-title">训练完成</text>
         <text class="done-summary">共完成 {{ completedSets }} 组</text>
-        <text class="done-note">{{ doneNote }}</text>
 
-        <div class="action-row complete-actions">
+        <div class="done-status-block">
+          <text class="done-status-title">{{ doneStatusTitle }}</text>
+          <text if="{{ doneStatusDetail }}" class="done-status-detail">{{ doneStatusDetail }}</text>
+        </div>
+
+        <div if="{{ !completionConfirmed }}" class="action-row complete-actions">
           <div if="{{ canUndo }}" class="half-action complete-half-action dark-half-action" onclick="undoLastSet">
             <text class="half-action-text dark-half-action-text">撤销最后一组</text>
           </div>
           <div else class="half-spacer"></div>
-          <div class="half-action complete-half-action light-half-action" onclick="restartWorkout">
-            <text class="half-action-text light-half-action-text">重新开始</text>
+          <div class="half-action complete-half-action light-half-action" onclick="confirmWorkoutComplete">
+            <text class="half-action-text light-half-action-text">完成</text>
           </div>
         </div>
       </div>
@@ -271,7 +275,10 @@ export default {
     restTimer: null,
     connectionReady: false,
     connectionLabel: '离线',
-    doneNote: '记录保存在手环，连接后同步'
+    completionConfirmed: false,
+    completionSynced: false,
+    doneStatusTitle: '已保存在手环',
+    doneStatusDetail: '连接后自动同步'
   },
 
   onInit() {
@@ -397,6 +404,8 @@ export default {
     this.editToggleText = '调整本组'
     this.editOriginalWeight = null
     this.editOriginalReps = 0
+    this.completionConfirmed = !!state.completionConfirmed
+    this.completionSynced = !!state.completionSynced
 
     var plannedSet = WORKOUT.exercises[this.exerciseIndex].sets[this.setIndex]
     this.currentWeight = state.currentWeight === null || typeof state.currentWeight === 'number'
@@ -404,6 +413,7 @@ export default {
       : plannedSet.weight
     this.currentReps = typeof state.currentReps === 'number' ? state.currentReps : plannedSet.reps
     this.refreshCurrentDisplay()
+    this.refreshDoneStatus()
 
     if (this.screen === 'rest') {
       if (!validSetIndex(this.pendingExerciseIndex, this.pendingSetIndex) || this.restEndAt <= 0) {
@@ -430,6 +440,8 @@ export default {
       currentReps: this.currentReps,
       completedRecords: this.completedRecords,
       restEndAt: this.restEndAt,
+      completionConfirmed: this.completionConfirmed,
+      completionSynced: this.completionSynced,
       updatedAt: nowMs()
     }
   },
@@ -473,6 +485,9 @@ export default {
     this.canUndo = false
     this.restRemaining = 0
     this.restEndAt = 0
+    this.completionConfirmed = false
+    this.completionSynced = false
+    this.refreshDoneStatus()
     this.loadCurrentSet()
   },
 
@@ -517,7 +532,22 @@ export default {
 
   refreshConnectionLabels() {
     this.connectionLabel = this.connectionReady ? '手机已连' : '离线'
-    this.doneNote = this.connectionReady ? '训练记录已发送到手机' : '记录保存在手环，连接后同步'
+    this.refreshDoneStatus()
+  },
+
+  refreshDoneStatus() {
+    if (this.completionSynced) {
+      this.doneStatusTitle = '已同步到手机'
+      this.doneStatusDetail = ''
+      return
+    }
+    if (this.connectionReady) {
+      this.doneStatusTitle = '正在同步到手机'
+      this.doneStatusDetail = '记录仍保存在手环'
+      return
+    }
+    this.doneStatusTitle = '已保存在手环'
+    this.doneStatusDetail = '连接后自动同步'
   },
 
   sendEnvelope(type, payload) {
@@ -562,7 +592,25 @@ export default {
     }
     if (message.type === 'plan') {
       this.applyIncomingPlan(message.payload)
+      return
     }
+    if (message.type === 'progress-ack') {
+      this.applyProgressAck(message.payload)
+    }
+  },
+
+  applyProgressAck(payload) {
+    payload = payload || {}
+    if (this.screen !== 'complete') {
+      return
+    }
+    if (String(payload.workoutId || '') !== String(WORKOUT.id || '') ||
+        String(payload.revision || '') !== String(WORKOUT.revision || '')) {
+      return
+    }
+    this.completionSynced = true
+    this.refreshDoneStatus()
+    this.saveState()
   },
 
   applyIncomingPlan(payload) {
@@ -580,6 +628,10 @@ export default {
 
     if (same) {
       return
+    }
+
+    if (this.screen === 'complete' && !this.completionSynced) {
+      this.publishProgress()
     }
 
     WORKOUT = plan
@@ -887,6 +939,8 @@ export default {
     this.editToggleText = '调整本组'
     this.editOriginalWeight = null
     this.editOriginalReps = 0
+    this.completionConfirmed = false
+    this.completionSynced = false
     this.exerciseIndex = record.exerciseIndex
     this.setIndex = record.setIndex
     this.pendingExerciseIndex = record.exerciseIndex
@@ -894,6 +948,7 @@ export default {
     this.restEndAt = 0
     this.restRemaining = 0
     this.loadCurrentSet(record.actualWeight, record.actualReps)
+    this.refreshDoneStatus()
     vibrator.vibrate({ mode: 'short' })
     this.saveState()
     this.publishProgress()
@@ -903,16 +958,25 @@ export default {
     this.stopRestTimer()
     this.restEndAt = 0
     this.restRemaining = 0
+    this.completionConfirmed = false
+    this.completionSynced = false
     this.screen = 'complete'
+    this.refreshDoneStatus()
     this.saveState()
     this.publishProgress()
     vibrator.vibrate({ mode: 'long' })
   },
 
-  restartWorkout() {
-    this.resetWorkoutState()
+  confirmWorkoutComplete() {
+    if (this.screen !== 'complete' || this.completionConfirmed) {
+      return
+    }
+    this.completionConfirmed = true
     this.saveState()
-    this.publishProgress()
+    if (!this.completionSynced) {
+      this.publishProgress()
+    }
+    vibrator.vibrate({ mode: 'short' })
   }
 }
 </script>
