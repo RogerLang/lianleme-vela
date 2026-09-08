@@ -8,11 +8,6 @@ on:
         required: true
         type: boolean
         default: false
-  push:
-    branches:
-      - main
-    paths:
-      - ".github/ci-probes/signed-rpk"
 
 permissions:
   contents: read
@@ -23,7 +18,7 @@ concurrency:
 
 jobs:
   build:
-    if: ${{ github.event_name == 'push' || (inputs.confirm && github.ref == 'refs/heads/main') }}
+    if: ${{ inputs.confirm && github.ref == 'refs/heads/main' }}
     runs-on: macos-14
     timeout-minutes: 12
 
