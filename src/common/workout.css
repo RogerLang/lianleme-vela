@@ -298,36 +298,45 @@
 }
 
 .rest-screen {
-  justify-content: center;
+  position: relative;
+  justify-content: flex-start;
+  padding-top: 4px;
 }
 
 .rest-title {
-  margin-top: 7px;
-  font-size: 25px;
+  width: 300px;
+  height: 34px;
+  font-size: 26px;
   font-weight: bold;
+  text-align: center;
   color: #aeb6c1;
 }
 
 .countdown {
   width: 300px;
-  height: 90px;
-  margin-top: 4px;
-  font-size: 80px;
+  height: 96px;
+  margin-top: 0px;
+  font-size: 82px;
   font-weight: bold;
   text-align: center;
   color: #ffffff;
 }
 
 .seconds {
-  margin-top: -3px;
+  position: absolute;
+  left: 202px;
+  top: 112px;
+  width: 26px;
+  height: 22px;
   font-size: 15px;
+  text-align: left;
   color: #9ba5b3;
 }
 
 .rest-adjust-row {
   width: 300px;
-  height: 50px;
-  margin-top: 10px;
+  height: 66px;
+  margin-top: 8px;
   flex-direction: row;
   justify-content: space-between;
   align-items: center;
@@ -335,24 +344,27 @@
 
 .rest-adjust-button {
   width: 144px;
-  height: 50px;
-  border-radius: 15px;
+  height: 66px;
+  border-radius: 18px;
   border-width: 1px;
-  border-color: #2a313b;
+  border-color: #303844;
   justify-content: center;
   align-items: center;
-  background-color: #0f141a;
+  background-color: #151b24;
 }
 
 .rest-adjust-text {
-  font-size: 17px;
+  width: 130px;
+  font-size: 19px;
   font-weight: bold;
-  color: #bdc5cf;
+  text-align: center;
+  color: #d7dde6;
 }
 
 .next-card {
+  position: relative;
   width: 300px;
-  height: 104px;
+  height: 112px;
   margin-top: 12px;
   border-radius: 18px;
   border-width: 1px;
@@ -364,14 +376,19 @@
 }
 
 .next-eyebrow {
-  font-size: 14px;
-  color: #a1aab7;
+  position: absolute;
+  left: 16px;
+  top: 11px;
+  width: 268px;
+  font-size: 15px;
+  text-align: left;
+  color: #aeb7c3;
 }
 
 .next-name {
   width: 270px;
-  margin-top: 3px;
-  font-size: 24px;
+  margin-top: 8px;
+  font-size: 30px;
   font-weight: bold;
   text-align: center;
   color: #ffffff;
@@ -381,19 +398,19 @@
 
 .next-meta {
   width: 270px;
-  margin-top: 5px;
-  font-size: 15px;
+  margin-top: 6px;
+  font-size: 16px;
   text-align: center;
-  color: #b3bbc6;
+  color: #c0c7d0;
 }
 
 .rest-actions {
-  height: 72px;
-  margin-top: 12px;
+  height: 76px;
+  margin-top: 14px;
 }
 
 .rest-half-action {
-  height: 72px;
+  height: 76px;
 }
 
 .complete-screen {
