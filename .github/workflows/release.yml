@@ -86,7 +86,7 @@ jobs:
           - Workout Protocol V1
           - 与 Android 正式 APK 使用同一签名身份
 
-          下载 Assets 中的 `.rpk` 文件即可长期保存或重新安装。`signing-certificate.txt` 用于核对签名证书指纹。
+          下载 Assets 中的 RPK 文件即可长期保存或重新安装。signing-certificate.txt 用于核对签名证书指纹。
           EOF
 
           gh release create "$TAG" \
