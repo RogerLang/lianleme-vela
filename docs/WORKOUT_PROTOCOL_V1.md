@@ -35,7 +35,7 @@ Sent when the wearable page initializes or reconnects.
 
 ```json
 {
-  "appVersion": "0.3.0",
+  "appVersion": "0.4.0",
   "planId": "plan-id",
   "workoutId": "workout-id",
   "revision": "workout-revision"
@@ -72,11 +72,11 @@ Explicit request for the current confirmed workout. Payload may be empty.
 }
 ```
 
-The wearable persists the plan locally. A different `id` or `revision` replaces the local active plan and starts a fresh wearable session. Receiving the same identity keeps the existing local session.
+The wearable persists the plan locally. A different `id` or `revision` replaces the local session only when there is no active or unacknowledged local progress. Receiving the same identity keeps the current local session.
 
-### `progress` — wearable -> phone
+### `progress` — either direction
 
-The wearable sends an authoritative snapshot after a set is completed, undone, the workout is restarted, the workout is completed, and after reconnecting.
+Both clients use the same progress snapshot shape. The wearable sends a snapshot after local set completion, undo, workout completion and reconnect. The Android app may send the current snapshot after phone-side set completion, undo or other session changes so the wearable can follow the same workout state.
 
 ```json
 {
@@ -84,12 +84,12 @@ The wearable sends an authoritative snapshot after a set is completed, undone, t
   "revision": "workout-revision",
   "planId": "plan-id",
   "status": "active",
-  "screen": "rest",
+  "screen": "workout",
   "exerciseIndex": 0,
   "setIndex": 1,
   "pendingExerciseIndex": 0,
   "pendingSetIndex": 1,
-  "restEndAt": 1788840090000,
+  "restEndAt": 0,
   "updatedAt": 1788840000000,
   "completedRecords": [
     {
@@ -105,11 +105,26 @@ The wearable sends an authoritative snapshot after a set is completed, undone, t
 }
 ```
 
-`status` is `ready`, `active`, or `complete`. The phone only imports progress whose `workoutId` and `revision` match its current confirmed workout.
+`status` is `ready`, `active`, or `complete`. A receiver only applies progress whose `workoutId` and `revision` match the current workout. The wearable derives its next visible set from the received `completedRecords` and enters the completion screen when the received progress is complete.
+
+### `progress-ack` — either direction
+
+Sent after a progress snapshot has been accepted. It acknowledges the workout identity and the applied progress timestamp.
+
+```json
+{
+  "workoutId": "workout-id",
+  "revision": "workout-revision",
+  "planId": "plan-id",
+  "updatedAt": 1788840000000
+}
+```
+
+The wearable keeps `syncPending` while local progress has not yet been acknowledged. During that period, incoming phone progress does not replace the pending local snapshot; the wearable republishes its current progress instead.
 
 ### `ack` — either direction
 
-Optional acknowledgement. V1 does not require retries based on `ack`; reconnect snapshots provide recovery.
+General acknowledgement for plan or control messages. V1 does not rely on this message for progress conflict handling; `progress-ack` is used for progress snapshots.
 
 ```json
 { "replyTo": "message-id" }
@@ -117,11 +132,19 @@ Optional acknowledgement. V1 does not require retries based on `ack`; reconnect 
 
 ## Conflict model
 
-V1 is optimized for one active workout controller at a time. The wearable keeps a complete local progress snapshot and sends it again after reconnection. The phone accepts only snapshots for the current workout revision and ignores older wearable snapshots by `updatedAt`.
+V1 uses `workoutId + revision` as the session identity and `updatedAt` as the progress revision timestamp.
+
+- Progress for another workout identity is ignored.
+- Local wearable progress is marked pending until acknowledged.
+- Pending wearable progress is retained across local storage restore and reconnection.
+- Incoming phone progress is applied only when no wearable progress is waiting for acknowledgement.
+- An older `progress-ack` does not clear a newer pending wearable snapshot.
+- A new plan does not replace an active or unacknowledged wearable workout; the wearable republishes its current progress first.
 
 ## Offline behavior
 
-- The wearable can complete the workout with no phone connection.
+- The wearable can continue and complete a cached workout without a phone connection.
 - Plan and session state are stored locally on the wearable.
 - On reconnection the wearable sends `hello` followed by its latest `progress` snapshot.
 - The phone can resend the current `plan` at any time; same-revision delivery is idempotent.
+- Once both sides exchange the current progress and acknowledgement, either client can continue driving the same workout session.

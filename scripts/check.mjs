@@ -27,12 +27,15 @@ const manifest = JSON.parse(read(manifestPath));
 const packageJson = JSON.parse(read(packagePath));
 const page = exists(pagePath) ? read(pagePath) : "";
 const protocol = exists(protocolPath) ? read(protocolPath) : "";
+const spec = exists(specPath) ? read(specPath) : "";
 
 if (manifest.package !== "io.github.rogerlang.lianleme") fail("Vela package must match Android package for Xiaomi interconnect");
 if (manifest.name !== "练了么") fail("Vela app name changed unexpectedly");
 if (!/^\d+\.\d+\.\d+$/.test(manifest.versionName || "")) fail("Vela versionName must use semantic x.y.z format");
 if (!Number.isInteger(manifest.versionCode) || manifest.versionCode < 1) fail("Vela versionCode must be a positive integer");
 if (packageJson.version !== manifest.versionName) fail("Vela package.json version must match manifest versionName");
+const runtimeVersion = page.match(/var APP_VERSION = ['\"]([^'\"]+)['\"]/);
+if (!runtimeVersion || runtimeVersion[1] !== manifest.versionName) fail("Vela runtime APP_VERSION must match manifest versionName");
 if (manifest.icon !== "/common/icon.png") fail("Vela manifest icon must remain /common/icon.png");
 if (!Array.isArray(manifest.deviceTypeList) || !manifest.deviceTypeList.includes("watch")) fail("Vela deviceTypeList must include watch");
 if (manifest.config?.designWidth !== 336) fail("Vela designWidth must remain 336 for Xiaomi Smart Band 9 Pro");
@@ -63,8 +66,11 @@ for (const marker of ["applyIncomingProgress", "progress-ack", "syncPending"]) {
 for (const marker of ["normalizeProgress", "progressMatchesPlan"]) {
   if (!protocol.includes(marker)) fail(`bidirectional protocol marker missing: ${marker}`);
 }
+for (const marker of ["progress` — either direction", "progress-ack", "syncPending"]) {
+  if (!spec.includes(marker)) fail(`Workout Protocol V1 documentation marker missing: ${marker}`);
+}
 
-for (const publicText of [page, protocol, exists(specPath) ? read(specPath) : ""]) {
+for (const publicText of [page, protocol, spec]) {
   if (publicText.includes("github_pat_") || publicText.includes("Authorization:") || publicText.includes("fitness-data-private")) {
     fail("Vela public source contains private credential or repository markers");
   }
