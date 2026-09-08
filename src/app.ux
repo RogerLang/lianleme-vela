@@ -1,0 +1,10 @@
+<script>
+export default {
+  onCreate() {
+    console.log("练了么 Vela band app created")
+  },
+  onDestroy() {
+    console.log("练了么 Vela band app destroyed")
+  }
+}
+</script>
