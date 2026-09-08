@@ -4,18 +4,18 @@
 
 ## 当前基线
 
-当前源码与签名发布基线为 0.4.1：
+当前源码、正式签名发布与真机验收基线为 0.4.2：
 
 ```text
-versionName 0.4.1
-versionCode 15
+versionName 0.4.2
+versionCode 16
 package io.github.rogerlang.lianleme
 minPlatformVersion 1200
 ```
 
-0.4.1 在 0.4.0 已完成真机验证的训练、调整、休息、完成、震动、退出、双向同步和 Launcher 图标能力上增加 RIR 记录：普通工作组完成后选择 RIR 0–5，并通过 Workout Protocol V1 的可选 `actualRir` 字段与 Android 同步。0.4.1 已通过仓库 CI、签名 RPK 构建和长期 Release 归档；新增 RIR 流程的最终真机验收仍以 Xiaomi Smart Band 9 Pro 实测为准。
+0.4.2 已完成 Xiaomi Smart Band 9 Pro 真机验收。当前已验证训练、调整、休息、完成、震动、退出、Launcher 图标、RIR 0–5、手机 ↔ 手环双向进度同步、断连恢复、最新训练计划下发，以及旧训练进度尚待确认时的新旧计划交接。手机端会安全保留旧 workout 的延后进度并返回 `progress-ack`；手环会暂存最新 incoming plan，待旧训练可以交接后自动应用，避免双方因 workout identity 已切换而互相等待。
 
-0.4.0 是上一版已完成 Xiaomi Smart Band 9 Pro 全流程真机验证的基线。包名与 Android `io.github.rogerlang.lianleme` 对齐，用于 Xiaomi `system.interconnect` 身份匹配。0.2.5 及更早版本使用 `com.rogerlang.lianleme.vela`，首次迁移到当前包名时需要先卸载旧包。
+0.4.1 首次加入 RIR 记录；0.4.0 是此前完成全流程真机验证的基线。当前 0.4.2 延续相同包名与签名身份，包名与 Android `io.github.rogerlang.lianleme` 对齐，用于 Xiaomi `system.interconnect` 身份匹配。0.2.5 及更早版本使用 `com.rogerlang.lianleme.vela`，首次迁移到当前包名时需要先卸载旧包。
 
 公开仓库不保存个人训练计划、训练记录、GitHub Token、Android keystore 或 PEM 私钥。
 
@@ -46,6 +46,8 @@ minPlatformVersion 1200
 - 完成组、休息结束与训练完成震动反馈
 - Xiaomi `system.interconnect` 双向通道
 - 从 Android 接收并持久化 Planned Workout
+- 新计划与旧训练冲突时暂存最新 plan，并在旧进度确认后自动交接
+- plan 接收返回 `accepted / deferred` ACK，手机端可识别实际应用状态
 - 手环完成组、撤销、完成训练后回传 progress snapshot
 - 手机端进度变化同步回手环，并回传 `progress-ack`
 - `actualRir` 作为可选进度字段双向同步
@@ -62,12 +64,14 @@ V1 采用 workout / progress 快照：
 - 手环启动或重连发送 `hello`。
 - 手机回复当前 `plan`。
 - 手环本地保存 plan 与训练进度。
+- 新 plan 无法立即交接时返回 `deferred` ACK 并暂存，满足交接条件后自动应用。
 - 手环关键训练变化后发送 `progress`。
 - 手机训练进度变化后也可发送 `progress`，手环更新到对应组状态。
 - 普通工作组可在 `completedRecords` 中附带可选 `actualRir`。
-- 接收端应用有效 progress 后发送 `progress-ack`。
+- 手机主 wearable bridge 统一处理实时消息与启动队列中的 `progress-ack`。
+- 旧 workout identity 的 progress 不覆盖手机当前训练，会先进入有界延后收件箱，再返回确认。
 - 重新连接时再次交换当前 progress，补齐断连期间的数据。
-- 双方只处理与当前 `workoutId + revision` 一致的进度。
+- 当前 workout identity 匹配的 progress 才会修改当前训练会话。
 
 ## 本地开发
 
@@ -121,7 +125,7 @@ designWidth 336
 `.github/workflows/release.yml`：
 
 - Signed Vela RPK 成功后读取当前版本号。
-- 若对应 `v<version>` Release 尚未存在，下载刚生成的签名 RPK 并创建永久 GitHub Release。
+- 若对应 `v<version>` Release 尚未存在，下载刚生成的签名 RPK并创建永久 GitHub Release。
 - 自动 Release 只声明 CI 与正式签名包归档状态，不自动声明真机验收完成。
 - 已经发布过的版本保持原有归档，不会被后续同版本构建替换。
 
