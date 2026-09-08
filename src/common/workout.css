@@ -414,7 +414,8 @@
 }
 
 .complete-screen {
-  justify-content: center;
+  justify-content: flex-start;
+  padding-top: 64px;
 }
 
 .done-mark-box {
@@ -437,38 +438,61 @@
 }
 
 .done-title {
-  margin-top: 15px;
+  width: 300px;
+  height: 40px;
+  margin-top: 14px;
   font-size: 30px;
   font-weight: bold;
+  text-align: center;
   color: #ffffff;
 }
 
 .done-summary {
-  margin-top: 7px;
+  width: 300px;
+  height: 28px;
+  margin-top: 6px;
   font-size: 19px;
+  text-align: center;
   color: #c2c9d2;
 }
 
-.done-note {
+.done-status-block {
+  width: 300px;
+  height: 44px;
+  margin-top: 18px;
+  flex-direction: column;
+  align-items: center;
+}
+
+.done-status-title {
   width: 290px;
-  margin-top: 7px;
-  font-size: 15px;
+  height: 22px;
+  font-size: 16px;
   text-align: center;
-  color: #9ba5b3;
+  color: #b8c1cc;
+}
+
+.done-status-detail {
+  width: 290px;
+  height: 20px;
+  margin-top: 2px;
+  font-size: 14px;
+  text-align: center;
+  color: #8f99a6;
 }
 
 .complete-actions {
-  height: 72px;
-  margin-top: 27px;
+  height: 76px;
+  margin-top: 28px;
 }
 
 .complete-half-action {
-  height: 72px;
+  height: 76px;
 }
 
 .half-spacer {
   width: 144px;
-  height: 72px;
+  height: 76px;
 }
 
 .restore-screen {
