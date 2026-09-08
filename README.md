@@ -62,6 +62,23 @@ npm run build
 
 `npm run build` 会先生成 `src/common/icon.png`，再调用 Xiaomi `aiot-toolkit` 构建 RPK。产物位于 `dist/`。
 
+### Smart Band 9 Pro 模拟器
+
+日常 UI 调整推荐直接使用 Xiaomi AIoT-IDE 的 Vela 模拟器。目标真机参数：
+
+```text
+Xiaomi Smart Band 9 Pro (M2401B1)
+336 × 480 px
+rectangular
+screen DPI 336
+DPR 2.1
+designWidth 336
+```
+
+推荐使用 `vela-watch-4.0` 镜像创建 `band` 类型的 336×480 Custom 模拟器。详细配置和调试流程见 [`docs/SMART_BAND_9_PRO_EMULATOR.md`](docs/SMART_BAND_9_PRO_EMULATOR.md)。
+
+模拟器用于高频布局和基础交互迭代；震动、Launcher 图标、真实性能以及 `system.interconnect` 最后仍在 M2401B1 真机验收。
+
 ## CI
 
 `.github/workflows/ci.yml`：
