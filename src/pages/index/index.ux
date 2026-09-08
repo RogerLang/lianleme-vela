@@ -3,7 +3,7 @@
     <div if="{{ ready }}" class="app-shell">
       <div class="topbar">
         <text class="brand">练了么</text>
-        <text if="{{ screen === 'workout' }}" class="top-progress">{{ setProgress }}</text>
+        <text if="{{ screen === 'workout' }}" class="top-progress">{{ connectionLabel }} · {{ setProgress }}</text>
       </div>
 
       <div if="{{ screen === 'workout' }}" class="screen workout-screen">
@@ -78,7 +78,7 @@
         <div class="done-mark-box"><text class="done-mark">✓</text></div>
         <text class="done-title">训练完成</text>
         <text class="done-summary">共完成 {{ completedSets }} 组</text>
-        <text class="done-note">训练记录已保存在手环本地</text>
+        <text class="done-note">{{ doneNote }}</text>
 
         <div class="action-row complete-actions">
           <div if="{{ canUndo }}" class="half-action complete-half-action dark-half-action" onclick="undoLastSet">
@@ -102,17 +102,25 @@
 <script>
 import storage from '@system.storage'
 import vibrator from '@system.vibrator'
+import interconnect from '@system.interconnect'
+import protocol from '../../common/workout-protocol.js'
 
-var STATE_KEY = 'lianleme.workout.state.v2'
-var STATE_VERSION = 2
+var PLAN_KEY = 'lianleme.workout.plan.v1'
+var STATE_KEY = 'lianleme.workout.state.v3'
+var STATE_VERSION = 3
+var APP_VERSION = '0.3.0'
 
-// Public repository demo fixture. Real phone-synced plans will replace this layer later.
-var WORKOUT = {
+var DEMO_WORKOUT = {
+  id: '',
+  revision: '',
+  planId: '',
   name: '演示训练',
   exercises: [
     {
+      exerciseId: 'demo-a',
       name: '动作 A',
       restSeconds: 60,
+      loadType: 'weighted',
       sets: [
         { weight: 20, reps: 8 },
         { weight: 20, reps: 8 },
@@ -120,8 +128,10 @@ var WORKOUT = {
       ]
     },
     {
+      exerciseId: 'demo-b',
       name: '动作 B',
       restSeconds: 45,
+      loadType: 'weighted',
       sets: [
         { weight: 12.5, reps: 10 },
         { weight: 12.5, reps: 10 },
@@ -129,8 +139,10 @@ var WORKOUT = {
       ]
     },
     {
+      exerciseId: 'demo-c',
       name: '动作 C',
       restSeconds: 30,
+      loadType: 'weighted',
       sets: [
         { weight: 10, reps: 12 },
         { weight: 10, reps: 12 }
@@ -139,15 +151,37 @@ var WORKOUT = {
   ]
 }
 
+var WORKOUT = DEMO_WORKOUT
+
 function nowMs() {
   return new Date().getTime()
 }
 
+function numeric(value) {
+  if (value === null || value === undefined || value === '') {
+    return null
+  }
+  var result = Number(value)
+  return isNaN(result) ? null : result
+}
+
 function formatWeight(value) {
+  value = numeric(value)
+  if (value === null) {
+    return '自重'
+  }
   if (value % 1 === 0) {
     return String(value)
   }
   return value.toFixed(1)
+}
+
+function formatPrescription(weight, reps) {
+  var value = numeric(weight)
+  if (value === null) {
+    return reps + ' 次'
+  }
+  return formatWeight(value) + ' kg × ' + reps
 }
 
 function countSets() {
@@ -180,13 +214,13 @@ export default {
     pendingExerciseIndex: 0,
     pendingSetIndex: 0,
     completedSets: 0,
-    totalSets: countSets(),
+    totalSets: 0,
     completedRecords: [],
     canUndo: false,
     currentExerciseName: '',
     currentSetLabel: '',
     currentRestSeconds: 0,
-    currentWeight: 0,
+    currentWeight: null,
     currentReps: 0,
     weightText: '',
     repsText: '',
@@ -199,11 +233,14 @@ export default {
     nextExerciseName: '',
     nextSetLabel: '',
     nextPrescription: '',
-    restTimer: null
+    restTimer: null,
+    connectionReady: false,
+    connectionLabel: '离线',
+    doneNote: '记录保存在手环，连接后同步'
   },
 
   onInit() {
-    this.restoreState()
+    this.restorePlan()
   },
 
   onShow() {
@@ -211,6 +248,7 @@ export default {
       return
     }
     this.resumeFromLifecycle()
+    this.sendHelloAndProgress()
   },
 
   onHide() {
@@ -227,6 +265,34 @@ export default {
     }
     this.stopRestTimer()
     this.saveState()
+  },
+
+  restorePlan() {
+    var that = this
+    storage.get({
+      key: PLAN_KEY,
+      default: '',
+      success: function(data) {
+        if (data) {
+          try {
+            var plan = protocol.normalizePlan(JSON.parse(data))
+            if (plan) {
+              WORKOUT = plan
+            }
+          } catch (error) {
+            console.log('Vela workout plan parse failed: ' + error)
+          }
+        }
+        that.totalSets = countSets()
+        that.restoreState()
+      },
+      fail: function(data, code) {
+        console.log('Vela workout plan read failed: ' + code)
+        WORKOUT = DEMO_WORKOUT
+        that.totalSets = countSets()
+        that.restoreState()
+      }
+    })
   },
 
   restoreState() {
@@ -248,18 +314,24 @@ export default {
         }
         that.ready = true
         that.resumeFromLifecycle()
+        that.setupInterconnect()
       },
       fail: function(data, code) {
         console.log('Vela workout state read failed: ' + code)
         that.resetWorkoutState()
         that.ready = true
         that.resumeFromLifecycle()
+        that.setupInterconnect()
       }
     })
   },
 
   applyStoredState(state) {
     if (!state || state.stateVersion !== STATE_VERSION) {
+      return false
+    }
+    if (String(state.workoutId || '') !== String(WORKOUT.id || '') ||
+        String(state.revision || '') !== String(WORKOUT.revision || '')) {
       return false
     }
     if (!validSetIndex(state.exerciseIndex, state.setIndex)) {
@@ -284,7 +356,9 @@ export default {
     this.editToggleText = '调整本组'
 
     var plannedSet = WORKOUT.exercises[this.exerciseIndex].sets[this.setIndex]
-    this.currentWeight = typeof state.currentWeight === 'number' ? state.currentWeight : plannedSet.weight
+    this.currentWeight = state.currentWeight === null || typeof state.currentWeight === 'number'
+      ? state.currentWeight
+      : plannedSet.weight
     this.currentReps = typeof state.currentReps === 'number' ? state.currentReps : plannedSet.reps
     this.refreshCurrentDisplay()
 
@@ -299,9 +373,11 @@ export default {
     return true
   },
 
-  saveState() {
-    var state = {
+  currentStateSnapshot() {
+    return {
       stateVersion: STATE_VERSION,
+      workoutId: String(WORKOUT.id || ''),
+      revision: String(WORKOUT.revision || ''),
       screen: this.screen,
       exerciseIndex: this.exerciseIndex,
       setIndex: this.setIndex,
@@ -313,12 +389,26 @@ export default {
       restEndAt: this.restEndAt,
       updatedAt: nowMs()
     }
+  },
 
+  saveState() {
+    var state = this.currentStateSnapshot()
     storage.set({
       key: STATE_KEY,
       value: JSON.stringify(state),
       fail: function(data, code) {
         console.log('Vela workout state save failed: ' + code)
+      }
+    })
+    return state
+  },
+
+  persistPlan() {
+    storage.set({
+      key: PLAN_KEY,
+      value: JSON.stringify(WORKOUT),
+      fail: function(data, code) {
+        console.log('Vela workout plan save failed: ' + code)
       }
     })
   },
@@ -334,10 +424,126 @@ export default {
     this.pendingSetIndex = 0
     this.completedRecords = []
     this.completedSets = 0
+    this.totalSets = countSets()
     this.canUndo = false
     this.restRemaining = 0
     this.restEndAt = 0
     this.loadCurrentSet()
+  },
+
+  setupInterconnect() {
+    var that = this
+    var conn = interconnect.instance()
+    this.conn = conn
+
+    conn.onmessage = function(data) {
+      that.handleIncomingMessage(data && data.data)
+    }
+    conn.onopen = function() {
+      that.connectionReady = true
+      that.refreshConnectionLabels()
+      that.sendHelloAndProgress()
+    }
+    conn.onclose = function() {
+      that.connectionReady = false
+      that.refreshConnectionLabels()
+    }
+    conn.onerror = function(data) {
+      that.connectionReady = false
+      that.refreshConnectionLabels()
+      console.log('Vela interconnect error: ' + (data && data.code))
+    }
+
+    conn.getReadyState({
+      success: function(data) {
+        that.connectionReady = !!data && data.status === 1
+        that.refreshConnectionLabels()
+        if (that.connectionReady) {
+          that.sendHelloAndProgress()
+        }
+      },
+      fail: function(data, code) {
+        that.connectionReady = false
+        that.refreshConnectionLabels()
+        console.log('Vela interconnect state failed: ' + code)
+      }
+    })
+  },
+
+  refreshConnectionLabels() {
+    this.connectionLabel = this.connectionReady ? '手机已连' : '离线'
+    this.doneNote = this.connectionReady ? '训练记录已发送到手机' : '记录保存在手环，连接后同步'
+  },
+
+  sendEnvelope(type, payload) {
+    if (!this.connectionReady || !this.conn) {
+      return false
+    }
+    var message = protocol.envelope(type, payload)
+    this.conn.send({
+      data: message,
+      fail: function(data, code) {
+        console.log('Vela interconnect send failed: ' + code)
+      }
+    })
+    return true
+  },
+
+  sendHelloAndProgress() {
+    if (!this.connectionReady) {
+      return
+    }
+    this.sendEnvelope('hello', {
+      appVersion: APP_VERSION,
+      planId: String(WORKOUT.planId || ''),
+      workoutId: String(WORKOUT.id || ''),
+      revision: String(WORKOUT.revision || '')
+    })
+    this.publishProgress()
+  },
+
+  publishProgress() {
+    if (!WORKOUT.id || !WORKOUT.revision) {
+      return
+    }
+    var state = this.currentStateSnapshot()
+    this.sendEnvelope('progress', protocol.progressPayload(WORKOUT, state))
+  },
+
+  handleIncomingMessage(raw) {
+    var message = protocol.decode(raw)
+    if (!message) {
+      return
+    }
+    if (message.type === 'plan') {
+      this.applyIncomingPlan(message.payload)
+    }
+  },
+
+  applyIncomingPlan(payload) {
+    var plan = protocol.normalizePlan(payload)
+    if (!plan || !plan.id || !plan.revision) {
+      return
+    }
+
+    var same = protocol.samePlan(WORKOUT, plan)
+    var activeLocalSession = this.completedRecords.length > 0 && this.screen !== 'complete'
+    if (!same && activeLocalSession && WORKOUT.id && WORKOUT.revision) {
+      this.publishProgress()
+      return
+    }
+
+    if (same) {
+      return
+    }
+
+    WORKOUT = plan
+    this.persistPlan()
+    this.totalSets = countSets()
+    this.resetWorkoutState()
+    this.saveState()
+    vibrator.vibrate({ mode: 'short' })
+    this.sendEnvelope('ack', { workoutId: WORKOUT.id, revision: WORKOUT.revision })
   },
 
   resumeFromLifecycle() {
@@ -354,7 +560,7 @@ export default {
 
   loadCurrentSet(weightOverride, repsOverride) {
     var set = WORKOUT.exercises[this.exerciseIndex].sets[this.setIndex]
-    this.currentWeight = typeof weightOverride === 'number' ? weightOverride : set.weight
+    this.currentWeight = weightOverride === null || typeof weightOverride === 'number' ? weightOverride : set.weight
     this.currentReps = typeof repsOverride === 'number' ? repsOverride : set.reps
     this.refreshCurrentDisplay()
   },
@@ -372,9 +578,9 @@ export default {
   },
 
   updatePrescription() {
-    this.weightText = formatWeight(this.currentWeight) + ' kg'
+    this.weightText = numeric(this.currentWeight) === null ? '自重' : formatWeight(this.currentWeight) + ' kg'
     this.repsText = this.currentReps + ' 次'
-    this.prescription = this.weightText + ' × ' + this.currentReps
+    this.prescription = formatPrescription(this.currentWeight, this.currentReps)
   },
 
   updateNextHint() {
@@ -416,7 +622,7 @@ export default {
   },
 
   decreaseWeight() {
-    if (this.currentWeight <= 2.5) {
+    if (numeric(this.currentWeight) === null || this.currentWeight <= 2.5) {
       return
     }
     this.currentWeight = this.currentWeight - 2.5
@@ -425,6 +631,9 @@ export default {
   },
 
   increaseWeight() {
+    if (numeric(this.currentWeight) === null) {
+      return
+    }
     this.currentWeight = this.currentWeight + 2.5
     this.updatePrescription()
     this.saveState()
@@ -482,6 +691,7 @@ export default {
     this.prepareRestScreen()
     this.screen = 'rest'
     this.saveState()
+    this.publishProgress()
     this.startRestTimer()
   },
 
@@ -498,7 +708,7 @@ export default {
 
     this.nextExerciseName = nextExercise.name
     this.nextSetLabel = '第 ' + (this.pendingSetIndex + 1) + ' / ' + nextExercise.sets.length + ' 组'
-    this.nextPrescription = formatWeight(nextSet.weight) + ' kg × ' + nextSet.reps
+    this.nextPrescription = formatPrescription(nextSet.weight, nextSet.reps)
   },
 
   syncRestRemaining() {
@@ -602,6 +812,7 @@ export default {
     this.loadCurrentSet(record.actualWeight, record.actualReps)
     vibrator.vibrate({ mode: 'short' })
     this.saveState()
+    this.publishProgress()
   },
 
   finishWorkout() {
@@ -610,424 +821,18 @@ export default {
     this.restRemaining = 0
     this.screen = 'complete'
     this.saveState()
+    this.publishProgress()
     vibrator.vibrate({ mode: 'long' })
   },
 
   restartWorkout() {
     this.resetWorkoutState()
     this.saveState()
+    this.publishProgress()
   }
 }
 </script>
 
 <style>
-.page {
-  width: 336px;
-  height: 480px;
-  flex-direction: column;
-  align-items: center;
-  background-color: #080a0f;
-}
-
-.app-shell {
-  width: 336px;
-  height: 480px;
-  padding-left: 18px;
-  padding-right: 18px;
-  padding-top: 11px;
-  padding-bottom: 10px;
-  flex-direction: column;
-  align-items: center;
-  background-color: #080a0f;
-}
-
-.topbar {
-  width: 300px;
-  height: 31px;
-  flex-direction: row;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.brand {
-  font-size: 21px;
-  font-weight: bold;
-  color: #ffffff;
-}
-
-.top-progress {
-  font-size: 13px;
-  color: #7e899b;
-}
-
-.screen {
-  width: 300px;
-  height: 428px;
-  flex-direction: column;
-  align-items: center;
-}
-
-.workout-screen {
-  justify-content: space-between;
-}
-
-.workout-main {
-  width: 300px;
-  flex-direction: column;
-  align-items: center;
-}
-
-.workout-context {
-  width: 300px;
-  height: 19px;
-  font-size: 13px;
-  text-align: center;
-  color: #748095;
-}
-
-.exercise-name {
-  width: 300px;
-  height: 41px;
-  margin-top: 3px;
-  font-size: 29px;
-  font-weight: bold;
-  text-align: center;
-  color: #ffffff;
-  lines: 1;
-  text-overflow: ellipsis;
-}
-
-.set-card {
-  width: 300px;
-  height: 118px;
-  margin-top: 5px;
-  border-radius: 22px;
-  border-width: 1px;
-  border-color: #202838;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  background-color: #151a24;
-}
-
-.set-label {
-  font-size: 14px;
-  color: #8792a5;
-}
-
-.prescription {
-  width: 276px;
-  margin-top: 5px;
-  font-size: 39px;
-  font-weight: bold;
-  text-align: center;
-  color: #ffffff;
-}
-
-.rest-hint {
-  margin-top: 6px;
-  font-size: 12px;
-  color: #657185;
-}
-
-.adjust-panel {
-  width: 300px;
-  height: 98px;
-  margin-top: 7px;
-  padding-left: 9px;
-  padding-right: 9px;
-  padding-top: 4px;
-  padding-bottom: 4px;
-  border-radius: 19px;
-  border-width: 1px;
-  border-color: #1c2432;
-  flex-direction: column;
-  background-color: #10151e;
-}
-
-.adjust-row {
-  width: 280px;
-  height: 43px;
-  flex-direction: row;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.second-adjust-row {
-  margin-top: 4px;
-}
-
-.step-button {
-  width: 78px;
-  height: 43px;
-  border-radius: 15px;
-  border-width: 1px;
-  border-color: #2b3546;
-  justify-content: center;
-  align-items: center;
-  background-color: #202837;
-}
-
-.step-text {
-  font-size: 16px;
-  font-weight: bold;
-  color: #cad4e3;
-}
-
-.adjust-value {
-  width: 112px;
-  font-size: 19px;
-  font-weight: bold;
-  text-align: center;
-  color: #ffffff;
-}
-
-.workout-action-zone {
-  width: 300px;
-  flex-direction: column;
-  align-items: center;
-}
-
-.action-row {
-  width: 300px;
-  flex-direction: row;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.workout-actions {
-  height: 82px;
-}
-
-.half-action {
-  width: 144px;
-  border-radius: 20px;
-  border-width: 1px;
-  justify-content: center;
-  align-items: center;
-}
-
-.workout-half-action {
-  height: 82px;
-}
-
-.dark-half-action {
-  border-color: #2a3445;
-  background-color: #1b2230;
-}
-
-.light-half-action {
-  border-color: #eef4ff;
-  background-color: #dce8ff;
-}
-
-.half-action-text {
-  width: 128px;
-  font-size: 18px;
-  font-weight: bold;
-  text-align: center;
-}
-
-.dark-half-action-text {
-  color: #d7e0ed;
-}
-
-.light-half-action-text {
-  color: #10213d;
-}
-
-.workout-meta-row {
-  width: 300px;
-  height: 23px;
-  margin-top: 5px;
-  flex-direction: row;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.undo-link {
-  font-size: 11px;
-  color: #606c80;
-}
-
-.next-hint {
-  font-size: 11px;
-  color: #596476;
-}
-
-.rest-screen {
-  justify-content: flex-start;
-}
-
-.rest-title {
-  margin-top: 5px;
-  font-size: 24px;
-  font-weight: bold;
-  color: #aab4c3;
-}
-
-.countdown {
-  width: 300px;
-  height: 87px;
-  margin-top: 2px;
-  font-size: 80px;
-  font-weight: bold;
-  text-align: center;
-  color: #ffffff;
-}
-
-.seconds {
-  margin-top: -5px;
-  font-size: 12px;
-  color: #68758a;
-}
-
-.rest-adjust-row {
-  width: 300px;
-  height: 48px;
-  margin-top: 8px;
-  flex-direction: row;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.rest-adjust-button {
-  width: 144px;
-  height: 48px;
-  border-radius: 16px;
-  border-width: 1px;
-  border-color: #1b2331;
-  justify-content: center;
-  align-items: center;
-  background-color: #10151d;
-}
-
-.rest-adjust-text {
-  font-size: 15px;
-  font-weight: bold;
-  color: #98a4b7;
-}
-
-.next-card {
-  width: 300px;
-  height: 102px;
-  margin-top: 10px;
-  border-radius: 22px;
-  border-width: 1px;
-  border-color: #202838;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  background-color: #151a24;
-}
-
-.next-eyebrow {
-  font-size: 11px;
-  color: #748095;
-}
-
-.next-name {
-  width: 270px;
-  margin-top: 3px;
-  font-size: 23px;
-  font-weight: bold;
-  text-align: center;
-  color: #ffffff;
-  lines: 1;
-  text-overflow: ellipsis;
-}
-
-.next-meta {
-  width: 270px;
-  margin-top: 5px;
-  font-size: 13px;
-  text-align: center;
-  color: #97a3b5;
-}
-
-.rest-actions {
-  height: 70px;
-  margin-top: 10px;
-}
-
-.rest-half-action {
-  height: 70px;
-}
-
-.complete-screen {
-  justify-content: center;
-}
-
-.done-mark-box {
-  width: 74px;
-  height: 74px;
-  border-radius: 37px;
-  border-width: 1px;
-  border-color: #263246;
-  justify-content: center;
-  align-items: center;
-  background-color: #182231;
-}
-
-.done-mark {
-  width: 74px;
-  font-size: 45px;
-  font-weight: bold;
-  text-align: center;
-  color: #dce8ff;
-}
-
-.done-title {
-  margin-top: 15px;
-  font-size: 30px;
-  font-weight: bold;
-  color: #ffffff;
-}
-
-.done-summary {
-  margin-top: 7px;
-  font-size: 18px;
-  color: #b5c0cf;
-}
-
-.done-note {
-  margin-top: 5px;
-  font-size: 12px;
-  color: #657185;
-}
-
-.complete-actions {
-  height: 70px;
-  margin-top: 27px;
-}
-
-.complete-half-action {
-  height: 70px;
-}
-
-.half-spacer {
-  width: 144px;
-  height: 70px;
-}
-
-.restore-screen {
-  width: 336px;
-  height: 480px;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  background-color: #080a0f;
-}
-
-.restore-brand {
-  font-size: 32px;
-  font-weight: bold;
-  color: #ffffff;
-}
-
-.restore-text {
-  margin-top: 11px;
-  font-size: 14px;
-  color: #748095;
-}
+@import '../../common/workout.css';
 </style>

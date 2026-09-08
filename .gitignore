@@ -1,5 +1,6 @@
 node_modules/
 dist/
+sign/
 src/common/icon.png
 *.log
 .DS_Store
