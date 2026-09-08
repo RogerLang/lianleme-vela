@@ -136,6 +136,7 @@ function normalizeProgress(value) {
         plannedReps: numberOrNull(record.plannedReps),
         actualWeight: numberOrNull(record.actualWeight),
         actualReps: numberOrNull(record.actualReps),
+        actualRir: numberOrNull(record.actualRir),
         completedAt: Math.max(0, Number(record.completedAt) || 0)
       }
     })

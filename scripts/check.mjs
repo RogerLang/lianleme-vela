@@ -63,10 +63,17 @@ if (!protocol.includes("lianleme.workout") || !protocol.includes("VERSION = 1"))
 for (const marker of ["applyIncomingProgress", "progress-ack", "syncPending"]) {
   if (!page.includes(marker)) fail(`bidirectional wearable sync marker missing: ${marker}`);
 }
-for (const marker of ["normalizeProgress", "progressMatchesPlan"]) {
+for (const marker of ["normalizeProgress", "progressMatchesPlan", "actualRir"]) {
   if (!protocol.includes(marker)) fail(`bidirectional protocol marker missing: ${marker}`);
 }
-for (const marker of ["progress` — either direction", "progress-ack", "syncPending"]) {
+for (const marker of ["screen === 'rir'", "selectRir0", "selectRir5", "actualRir", "finishCurrentSet(null)"]) {
+  if (!page.includes(marker)) fail(`wearable RIR flow marker missing: ${marker}`);
+}
+const rirRowCount = (page.match(/class="rir-row"/g) || []).length;
+if (rirRowCount !== 3) fail(`wearable RIR picker must have exactly 3 rows, found ${rirRowCount}`);
+const rirButtonCount = (page.match(/class="rir-button"/g) || []).length;
+if (rirButtonCount !== 6) fail(`wearable RIR picker must have exactly 6 buttons, found ${rirButtonCount}`);
+for (const marker of ["progress` — either direction", "progress-ack", "syncPending", "actualRir"]) {
   if (!spec.includes(marker)) fail(`Workout Protocol V1 documentation marker missing: ${marker}`);
 }
 

@@ -35,7 +35,7 @@ Sent when the wearable page initializes or reconnects.
 
 ```json
 {
-  "appVersion": "0.4.0",
+  "appVersion": "0.4.1",
   "planId": "plan-id",
   "workoutId": "workout-id",
   "revision": "workout-revision"
@@ -99,11 +99,14 @@ Both clients use the same progress snapshot shape. The wearable sends a snapshot
       "plannedReps": 8,
       "actualWeight": 60,
       "actualReps": 8,
+      "actualRir": 2,
       "completedAt": 1788840000000
     }
   ]
 }
 ```
+
+`actualRir` is optional for backward compatibility. When present for a normal working set it is a numeric RIR value; the wearable UI records values from `0` through `5`. Warm-up sets and older clients may send `null` or omit the field. Receivers must preserve compatibility with progress snapshots that do not contain RIR.
 
 `status` is `ready`, `active`, or `complete`. A receiver only applies progress whose `workoutId` and `revision` match the current workout. The wearable derives its next visible set from the received `completedRecords` and enters the completion screen when the received progress is complete.
 
@@ -145,6 +148,7 @@ V1 uses `workoutId + revision` as the session identity and `updatedAt` as the pr
 
 - The wearable can continue and complete a cached workout without a phone connection.
 - Plan and session state are stored locally on the wearable.
+- If the wearable is closed while the RIR picker is visible, the existing state schema restores that picker and the current set without discarding the pending entry.
 - On reconnection the wearable sends `hello` followed by its latest `progress` snapshot.
 - The phone can resend the current `plan` at any time; same-revision delivery is idempotent.
 - Once both sides exchange the current progress and acknowledgement, either client can continue driving the same workout session.
