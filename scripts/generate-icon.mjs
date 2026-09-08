@@ -20,9 +20,18 @@ function setPixel(x, y, r, g, b, a = 255) {
   rgba[i + 3] = a;
 }
 
-function fillCanvas(color) {
-  for (let y = 0; y < WORK_SIZE; y++) {
-    for (let x = 0; x < WORK_SIZE; x++) setPixel(x, y, ...color);
+function fillCircle(cx, cy, radius, color) {
+  const r2 = radius * radius;
+  const left = Math.max(0, Math.floor(cx - radius));
+  const right = Math.min(WORK_SIZE - 1, Math.ceil(cx + radius));
+  const top = Math.max(0, Math.floor(cy - radius));
+  const bottom = Math.min(WORK_SIZE - 1, Math.ceil(cy + radius));
+  for (let y = top; y <= bottom; y++) {
+    for (let x = left; x <= right; x++) {
+      const dx = x + 0.5 - cx;
+      const dy = y + 0.5 - cy;
+      if (dx * dx + dy * dy <= r2) setPixel(x, y, ...color);
+    }
   }
 }
 
@@ -45,9 +54,11 @@ function s(value) {
   return Math.round(value * SCALE);
 }
 
-// Vela launchers apply their own icon mask. Keep the 192x192 artwork full-bleed
-// so the masked icon matches the visual diameter of neighboring system icons.
-fillCanvas([246, 248, 251, 255]);
+// Xiaomi Smart Band 9 Pro does not consistently apply a launcher mask to
+// third-party Vela quick-app icons. Bake the circular silhouette into the RGBA
+// bitmap and leave the four corners transparent so the icon remains circular
+// even when the launcher displays the source bitmap as-is.
+fillCircle(s(96), s(96), s(84), [246, 248, 251, 255]);
 fillRoundedRect(s(44), s(58), s(78), s(20), s(7), [91, 154, 222, 255]);
 fillRoundedRect(s(44), s(86), s(96), s(20), s(7), [62, 124, 201, 255]);
 fillRoundedRect(s(44), s(114), s(112), s(20), s(7), [43, 96, 174, 255]);
