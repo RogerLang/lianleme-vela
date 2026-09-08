@@ -54,14 +54,13 @@ function s(value) {
   return Math.round(value * SCALE);
 }
 
-// Xiaomi Smart Band 9 Pro does not consistently apply a launcher mask to
-// third-party Vela quick-app icons. Bake the circular silhouette into the RGBA
-// bitmap and leave the four corners transparent so the icon remains circular
-// even when the launcher displays the source bitmap as-is.
-fillCircle(s(96), s(96), s(84), [246, 248, 251, 255]);
-fillRoundedRect(s(44), s(58), s(78), s(20), s(7), [91, 154, 222, 255]);
-fillRoundedRect(s(44), s(86), s(96), s(20), s(7), [62, 124, 201, 255]);
-fillRoundedRect(s(44), s(114), s(112), s(20), s(7), [43, 96, 174, 255]);
+// Band 9 Pro displays third-party Vela icon bitmaps close to their source
+// silhouette. Keep transparent corners for a guaranteed circular outline, while
+// using almost the full 192x192 canvas so the perceived size matches system apps.
+fillCircle(s(96), s(96), s(93), [246, 248, 251, 255]);
+fillRoundedRect(s(40), s(56), s(84), s(22), s(8), [91, 154, 222, 255]);
+fillRoundedRect(s(40), s(85), s(104), s(22), s(8), [62, 124, 201, 255]);
+fillRoundedRect(s(40), s(114), s(122), s(22), s(8), [43, 96, 174, 255]);
 
 const downsampled = Buffer.alloc(SIZE * SIZE * 4, 0);
 for (let y = 0; y < SIZE; y++) {
