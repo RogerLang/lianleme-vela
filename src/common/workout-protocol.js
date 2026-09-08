@@ -110,6 +110,47 @@ function samePlan(left, right) {
     String(left.revision || '') === String(right.revision || '')
 }
 
+function normalizeProgress(value) {
+  if (!value || typeof value !== 'object') {
+    return null
+  }
+  var records = Array.isArray(value.completedRecords) ? value.completedRecords : []
+  return {
+    workoutId: String(value.workoutId || ''),
+    revision: String(value.revision || ''),
+    planId: String(value.planId || ''),
+    status: value.status === 'complete' || value.status === 'ready' ? value.status : 'active',
+    screen: String(value.screen || 'workout'),
+    exerciseIndex: Math.max(0, Math.floor(Number(value.exerciseIndex) || 0)),
+    setIndex: Math.max(0, Math.floor(Number(value.setIndex) || 0)),
+    pendingExerciseIndex: Math.max(0, Math.floor(Number(value.pendingExerciseIndex) || 0)),
+    pendingSetIndex: Math.max(0, Math.floor(Number(value.pendingSetIndex) || 0)),
+    restEndAt: Math.max(0, Number(value.restEndAt) || 0),
+    updatedAt: Math.max(0, Number(value.updatedAt) || 0),
+    completedRecords: records.map(function(record) {
+      record = record || {}
+      return {
+        exerciseIndex: Math.max(0, Math.floor(Number(record.exerciseIndex) || 0)),
+        setIndex: Math.max(0, Math.floor(Number(record.setIndex) || 0)),
+        plannedWeight: numberOrNull(record.plannedWeight),
+        plannedReps: numberOrNull(record.plannedReps),
+        actualWeight: numberOrNull(record.actualWeight),
+        actualReps: numberOrNull(record.actualReps),
+        completedAt: Math.max(0, Number(record.completedAt) || 0)
+      }
+    })
+  }
+}
+
+function progressMatchesPlan(progress, workout) {
+  if (!progress || !workout) {
+    return false
+  }
+  return String(progress.workoutId || '') === String(workout.id || '') &&
+    String(progress.revision || '') === String(workout.revision || '') &&
+    String(progress.planId || '') === String(workout.planId || '')
+}
+
 function progressPayload(workout, state) {
   state = state || {}
   return {
@@ -135,5 +176,7 @@ export default {
   decode: decode,
   normalizePlan: normalizePlan,
   samePlan: samePlan,
+  normalizeProgress: normalizeProgress,
+  progressMatchesPlan: progressMatchesPlan,
   progressPayload: progressPayload
 }
