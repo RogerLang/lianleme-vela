@@ -60,11 +60,11 @@
 }
 
 .exercise-name {
-  width: 272px;
+  width: 300px;
   height: 46px;
   font-size: 31px;
   font-weight: bold;
-  text-align: left;
+  text-align: center;
   color: #ffffff;
   lines: 1;
   text-overflow: ellipsis;
