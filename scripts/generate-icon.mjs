@@ -56,11 +56,12 @@ function s(value) {
   return Math.round(value * SCALE);
 }
 
-fillCanvas([0, 0, 0, 255]);
-fillCircle(s(96), s(96), s(76), [246, 248, 251, 255]);
-fillRoundedRect(s(48), s(60), s(72), s(18), s(6), [91, 154, 222, 255]);
-fillRoundedRect(s(48), s(87), s(88), s(18), s(6), [62, 124, 201, 255]);
-fillRoundedRect(s(48), s(114), s(104), s(18), s(6), [43, 96, 174, 255]);
+// Transparent corners make the launcher silhouette circular.
+// Use a 186px footprint so the icon fills the launcher slot more naturally.
+fillCircle(s(96), s(96), s(93), [246, 248, 251, 255]);
+fillRoundedRect(s(40), s(56), s(84), s(22), s(8), [91, 154, 222, 255]);
+fillRoundedRect(s(40), s(85), s(104), s(22), s(8), [62, 124, 201, 255]);
+fillRoundedRect(s(40), s(114), s(122), s(22), s(8), [43, 96, 174, 255]);
 
 const downsampled = Buffer.alloc(SIZE * SIZE * 4, 0);
 for (let y = 0; y < SIZE; y++) {
