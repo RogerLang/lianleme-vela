@@ -60,11 +60,11 @@
 }
 
 .exercise-name {
-  width: 300px;
+  width: 272px;
   height: 46px;
   font-size: 31px;
   font-weight: bold;
-  text-align: center;
+  text-align: left;
   color: #ffffff;
   lines: 1;
   text-overflow: ellipsis;
@@ -84,12 +84,14 @@
 }
 
 .set-label {
+  width: 272px;
   font-size: 17px;
+  text-align: left;
   color: #c0c7d0;
 }
 
 .prescription {
-  width: 280px;
+  width: 272px;
   margin-top: 4px;
   font-size: 40px;
   font-weight: bold;
@@ -98,8 +100,10 @@
 }
 
 .rest-hint {
+  width: 272px;
   margin-top: 6px;
   font-size: 15px;
+  text-align: left;
   color: #aeb7c3;
 }
 
