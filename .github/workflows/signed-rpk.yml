@@ -1,0 +1,121 @@
+name: Signed Vela RPK
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: "确认使用 Android 发布签名构建互联 RPK"
+        required: true
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: vela-signed-rpk
+  cancel-in-progress: false
+
+jobs:
+  build:
+    if: ${{ inputs.confirm && github.ref == 'refs/heads/main' }}
+    runs-on: macos-14
+    timeout-minutes: 12
+
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v7
+        with:
+          ref: main
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 20
+
+      - name: Setup Java
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Verify signing secrets
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          STORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          for value in KEYSTORE_B64 STORE_PASSWORD KEY_ALIAS; do
+            if [ -z "${!value:-}" ]; then
+              echo "::error::Missing required Actions secret: $value"
+              exit 1
+            fi
+          done
+
+      - name: Derive Vela PEM signing files
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          STORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          JKS="$RUNNER_TEMP/lianleme-release.jks"
+          P12="$RUNNER_TEMP/lianleme-release.p12"
+          PEM="$RUNNER_TEMP/lianleme-release.pem"
+          P12_PASSWORD="vela-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+
+          printf '%s' "$KEYSTORE_B64" | base64 --decode > "$JKS"
+          chmod 600 "$JKS"
+
+          keytool -importkeystore \
+            -srckeystore "$JKS" \
+            -srcstorepass "$STORE_PASSWORD" \
+            -srcalias "$KEY_ALIAS" \
+            -srckeypass "$STORE_PASSWORD" \
+            -destkeystore "$P12" \
+            -deststoretype PKCS12 \
+            -deststorepass "$P12_PASSWORD" \
+            -destkeypass "$P12_PASSWORD" \
+            -noprompt
+
+          openssl pkcs12 -nodes -in "$P12" -passin "pass:$P12_PASSWORD" -out "$PEM"
+          mkdir -p sign/debug sign/release
+          awk '/-----BEGIN PRIVATE KEY-----/,/-----END PRIVATE KEY-----/' "$PEM" > sign/release/private.pem
+          awk '/-----BEGIN CERTIFICATE-----/,/-----END CERTIFICATE-----/' "$PEM" > sign/release/certificate.pem
+          cp sign/release/private.pem sign/debug/private.pem
+          cp sign/release/certificate.pem sign/debug/certificate.pem
+          test -s sign/release/private.pem
+          test -s sign/release/certificate.pem
+          chmod 600 sign/debug/private.pem sign/release/private.pem
+
+      - name: Check project
+        run: npm run check
+
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Build signed RPK
+        run: npm run release
+
+      - name: Verify RPK output
+        shell: bash
+        run: |
+          set -euo pipefail
+          find dist -maxdepth 1 -type f -name '*.rpk' -print
+          test -n "$(find dist -maxdepth 1 -type f -name '*.rpk' -print -quit)"
+
+      - name: Remove signing material
+        if: ${{ always() }}
+        shell: bash
+        run: rm -rf sign "$RUNNER_TEMP/lianleme-release.jks" "$RUNNER_TEMP/lianleme-release.p12" "$RUNNER_TEMP/lianleme-release.pem"
+
+      - name: Upload signed RPK
+        uses: actions/upload-artifact@v7
+        with:
+          name: lianleme-vela-signed-rpk
+          path: dist/*.rpk
+          if-no-files-found: error
+          retention-days: 3
