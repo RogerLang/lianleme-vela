@@ -57,6 +57,12 @@ for (const required of ["node_modules", "build", "dist", "src/common/icon.png"])
 if (!page.includes("@system.interconnect")) fail("Vela workout page must import system.interconnect");
 if (!page.includes("@system.app")) fail("Vela workout page must import system.app");
 if (!protocol.includes("lianleme.workout") || !protocol.includes("VERSION = 1")) fail("Workout Protocol V1 marker is missing");
+for (const marker of ["applyIncomingProgress", "progress-ack", "syncPending"]) {
+  if (!page.includes(marker)) fail(`bidirectional wearable sync marker missing: ${marker}`);
+}
+for (const marker of ["normalizeProgress", "progressMatchesPlan"]) {
+  if (!protocol.includes(marker)) fail(`bidirectional protocol marker missing: ${marker}`);
+}
 
 for (const publicText of [page, protocol, exists(specPath) ? read(specPath) : ""]) {
   if (publicText.includes("github_pat_") || publicText.includes("Authorization:") || publicText.includes("fitness-data-private")) {
