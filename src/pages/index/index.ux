@@ -379,6 +379,9 @@ export default {
     if (!state || state.stateVersion !== STATE_VERSION) {
       return false
     }
+    if (!WORKOUT.id && !WORKOUT.revision && state.screen === 'complete' && state.completionConfirmed) {
+      return false
+    }
     if (String(state.workoutId || '') !== String(WORKOUT.id || '') ||
         String(state.revision || '') !== String(WORKOUT.revision || '')) {
       return false
