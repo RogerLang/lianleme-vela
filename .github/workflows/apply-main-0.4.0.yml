@@ -24,44 +24,48 @@ jobs:
         run: |
           python <<'PY'
           from pathlib import Path
+          import re
 
-          def replace_once(path, old, new):
-              p = Path(path)
-              text = p.read_text(encoding='utf-8')
+          def read(path):
+              return Path(path).read_text(encoding='utf-8')
+
+          def write(path, text):
+              Path(path).write_text(text, encoding='utf-8')
+
+          def one(text, old, new, label):
               if old not in text:
-                  raise SystemExit(f'missing expected block in {path}: {old[:80]!r}')
-              p.write_text(text.replace(old, new, 1), encoding='utf-8')
+                  raise SystemExit(f'missing marker: {label}')
+              return text.replace(old, new, 1)
 
-          def replace_n(path, old, new, count):
-              p = Path(path)
-              text = p.read_text(encoding='utf-8')
-              if text.count(old) < count:
-                  raise SystemExit(f'expected {count} occurrences in {path}: {old!r}')
-              p.write_text(text.replace(old, new, count), encoding='utf-8')
+          def sub1(text, pattern, repl, label):
+              out, count = re.subn(pattern, repl, text, count=1, flags=re.S)
+              if count != 1:
+                  raise SystemExit(f'pattern mismatch {label}: {count}')
+              return out
 
-          replace_once('package.json', '"version": "0.3.0"', '"version": "0.4.0"')
-          replace_n('package-lock.json', '"version": "0.3.0"', '"version": "0.4.0"', 2)
-          replace_once('src/manifest.json', '"versionName": "0.3.0",\n  "versionCode": 9', '"versionName": "0.4.0",\n  "versionCode": 14')
+          text = read('package.json')
+          write('package.json', one(text, '"version": "0.3.0"', '"version": "0.4.0"', 'package version'))
 
-          replace_once(
-              'scripts/generate-icon.mjs',
-              '''fillCanvas([0, 0, 0, 255]);
-          fillCircle(s(96), s(96), s(76), [246, 248, 251, 255]);
-          fillRoundedRect(s(48), s(60), s(72), s(18), s(6), [91, 154, 222, 255]);
-          fillRoundedRect(s(48), s(87), s(88), s(18), s(6), [62, 124, 201, 255]);
-          fillRoundedRect(s(48), s(114), s(104), s(18), s(6), [43, 96, 174, 255]);''',
-              '''// Transparent corners make the launcher silhouette circular. The 186px
-          // footprint uses almost the full source canvas so it matches system icon scale.
-          fillCircle(s(96), s(96), s(93), [246, 248, 251, 255]);
-          fillRoundedRect(s(40), s(56), s(84), s(22), s(8), [91, 154, 222, 255]);
-          fillRoundedRect(s(40), s(85), s(104), s(22), s(8), [62, 124, 201, 255]);
-          fillRoundedRect(s(40), s(114), s(122), s(22), s(8), [43, 96, 174, 255]);'''
+          text = read('package-lock.json')
+          if text.count('"version": "0.3.0"') < 2:
+              raise SystemExit('package-lock version markers missing')
+          write('package-lock.json', text.replace('"version": "0.3.0"', '"version": "0.4.0"', 2))
+
+          text = read('src/manifest.json')
+          text = one(text, '"versionName": "0.3.0",\n  "versionCode": 9', '"versionName": "0.4.0",\n  "versionCode": 14', 'manifest version')
+          write('src/manifest.json', text)
+
+          text = read('scripts/generate-icon.mjs')
+          text = one(
+              text,
+              'fillCanvas([0, 0, 0, 255]);\nfillCircle(s(96), s(96), s(76), [246, 248, 251, 255]);\nfillRoundedRect(s(48), s(60), s(72), s(18), s(6), [91, 154, 222, 255]);\nfillRoundedRect(s(48), s(87), s(88), s(18), s(6), [62, 124, 201, 255]);\nfillRoundedRect(s(48), s(114), s(104), s(18), s(6), [43, 96, 174, 255]);',
+              '// Transparent corners make the launcher silhouette circular.\n// Use a 186px footprint so the icon fills the launcher slot more naturally.\nfillCircle(s(96), s(96), s(93), [246, 248, 251, 255]);\nfillRoundedRect(s(40), s(56), s(84), s(22), s(8), [91, 154, 222, 255]);\nfillRoundedRect(s(40), s(85), s(104), s(22), s(8), [62, 124, 201, 255]);\nfillRoundedRect(s(40), s(114), s(122), s(22), s(8), [43, 96, 174, 255]);',
+              'launcher icon block'
           )
+          write('scripts/generate-icon.mjs', text)
 
-          replace_once(
-              'src/common/workout-protocol.js',
-              '''function progressPayload(workout, state) {''',
-              '''function normalizeProgress(value) {
+          text = read('src/common/workout-protocol.js')
+          helper = '''function normalizeProgress(value) {
             if (!value || typeof value !== 'object') {
               return null
             }
@@ -101,132 +105,22 @@ jobs:
               String(progress.revision || '') === String(workout.revision || '')
           }
 
-          function progressPayload(workout, state) {'''
-          )
-          replace_once(
-              'src/common/workout-protocol.js',
-              '''  samePlan: samePlan,
-            progressPayload: progressPayload''',
-              '''  samePlan: samePlan,
-            normalizeProgress: normalizeProgress,
-            progressMatchesPlan: progressMatchesPlan,
-            progressPayload: progressPayload'''
-          )
+          '''
+          text = one(text, 'function progressPayload(workout, state) {', helper + 'function progressPayload(workout, state) {', 'protocol helper insertion')
+          text = one(text, '  samePlan: samePlan,\n  progressPayload: progressPayload', '  samePlan: samePlan,\n  normalizeProgress: normalizeProgress,\n  progressMatchesPlan: progressMatchesPlan,\n  progressPayload: progressPayload', 'protocol exports')
+          write('src/common/workout-protocol.js', text)
 
-          index = Path('src/pages/index/index.ux')
-          text = index.read_text(encoding='utf-8')
+          text = read('src/pages/index/index.ux')
+          text = one(text, "var APP_VERSION = '0.3.0'", "var APP_VERSION = '0.4.0'", 'app version')
+          text = one(text, '\nexport default {', "\nfunction recordKey(exerciseIndex, setIndex) {\n  return String(exerciseIndex) + ':' + String(setIndex)\n}\n\nexport default {", 'recordKey')
+          text = one(text, "    completionSynced: false,\n    doneStatusTitle: '已保存在手环',", "    completionSynced: false,\n    syncPending: false,\n    progressUpdatedAt: 0,\n    lastAckUpdatedAt: 0,\n    doneStatusTitle: '已保存在手环',", 'private sync fields')
+          text = one(text, '    this.completionSynced = !!state.completionSynced\n\n    var plannedSet', "    this.completionSynced = !!state.completionSynced\n    this.progressUpdatedAt = Number(state.progressUpdatedAt || state.updatedAt) || nowMs()\n    this.lastAckUpdatedAt = Number(state.lastAckUpdatedAt) || 0\n    this.syncPending = typeof state.syncPending === 'boolean'\n      ? state.syncPending\n      : (this.completedRecords.length > 0 && !this.completionSynced)\n\n    var plannedSet", 'restore sync state')
+          text = one(text, '      completionSynced: this.completionSynced,\n      updatedAt: nowMs()', '      completionSynced: this.completionSynced,\n      updatedAt: this.progressUpdatedAt || nowMs(),\n      progressUpdatedAt: this.progressUpdatedAt || nowMs(),\n      syncPending: this.syncPending,\n      lastAckUpdatedAt: this.lastAckUpdatedAt', 'snapshot sync fields')
+          text = one(text, '\n  saveState() {', "\n  markProgressDirty() {\n    this.progressUpdatedAt = nowMs()\n    this.syncPending = true\n    if (this.screen === 'complete') {\n      this.completionSynced = false\n    }\n  },\n\n  saveState() {", 'mark dirty method')
+          text = one(text, '    this.completionConfirmed = false\n    this.completionSynced = false\n    this.refreshDoneStatus()\n    this.loadCurrentSet()', '    this.completionConfirmed = false\n    this.completionSynced = false\n    this.syncPending = false\n    this.progressUpdatedAt = nowMs()\n    this.lastAckUpdatedAt = 0\n    this.refreshDoneStatus()\n    this.loadCurrentSet()', 'reset sync state')
+          text = one(text, "    if (message.type === 'progress-ack') {", "    if (message.type === 'progress') {\n      this.applyIncomingProgress(message.payload)\n      return\n    }\n    if (message.type === 'progress-ack') {", 'progress message branch')
 
-          changes = [
-            ("var APP_VERSION = '0.3.0'", "var APP_VERSION = '0.4.0'"),
-            ('''function validSetIndex(exerciseIndex, setIndex) {
-            if (typeof exerciseIndex !== 'number' || typeof setIndex !== 'number') {
-              return false
-            }
-            if (exerciseIndex < 0 || exerciseIndex >= WORKOUT.exercises.length) {
-              return false
-            }
-            var exercise = WORKOUT.exercises[exerciseIndex]
-            return setIndex >= 0 && setIndex < exercise.sets.length
-          }
-
-          export default {''', '''function validSetIndex(exerciseIndex, setIndex) {
-            if (typeof exerciseIndex !== 'number' || typeof setIndex !== 'number') {
-              return false
-            }
-            if (exerciseIndex < 0 || exerciseIndex >= WORKOUT.exercises.length) {
-              return false
-            }
-            var exercise = WORKOUT.exercises[exerciseIndex]
-            return setIndex >= 0 && setIndex < exercise.sets.length
-          }
-
-          function recordKey(exerciseIndex, setIndex) {
-            return String(exerciseIndex) + ':' + String(setIndex)
-          }
-
-          export default {'''),
-            ('''    completionConfirmed: false,
-            completionSynced: false,
-            doneStatusTitle: '已保存在手环',''', '''    completionConfirmed: false,
-            completionSynced: false,
-            syncPending: false,
-            progressUpdatedAt: 0,
-            lastAckUpdatedAt: 0,
-            doneStatusTitle: '已保存在手环','''),
-            ('''    this.completionConfirmed = !!state.completionConfirmed
-            this.completionSynced = !!state.completionSynced
-
-            var plannedSet''', '''    this.completionConfirmed = !!state.completionConfirmed
-            this.completionSynced = !!state.completionSynced
-            this.progressUpdatedAt = Number(state.progressUpdatedAt || state.updatedAt) || nowMs()
-            this.lastAckUpdatedAt = Number(state.lastAckUpdatedAt) || 0
-            this.syncPending = typeof state.syncPending === 'boolean'
-              ? state.syncPending
-              : (this.completedRecords.length > 0 && !this.completionSynced)
-
-            var plannedSet'''),
-            ('''      completionConfirmed: this.completionConfirmed,
-              completionSynced: this.completionSynced,
-              updatedAt: nowMs()
-            }
-          },
-
-          saveState() {''', '''      completionConfirmed: this.completionConfirmed,
-              completionSynced: this.completionSynced,
-              updatedAt: this.progressUpdatedAt || nowMs(),
-              progressUpdatedAt: this.progressUpdatedAt || nowMs(),
-              syncPending: this.syncPending,
-              lastAckUpdatedAt: this.lastAckUpdatedAt
-            }
-          },
-
-          markProgressDirty() {
-            this.progressUpdatedAt = nowMs()
-            this.syncPending = true
-            if (this.screen === 'complete') {
-              this.completionSynced = false
-            }
-          },
-
-          saveState() {'''),
-            ('''    this.completionConfirmed = false
-            this.completionSynced = false
-            this.refreshDoneStatus()
-            this.loadCurrentSet()''', '''    this.completionConfirmed = false
-            this.completionSynced = false
-            this.syncPending = false
-            this.progressUpdatedAt = nowMs()
-            this.lastAckUpdatedAt = 0
-            this.refreshDoneStatus()
-            this.loadCurrentSet()'''),
-            ('''    if (message.type === 'plan') {
-              this.applyIncomingPlan(message.payload)
-              return
-            }
-            if (message.type === 'progress-ack') {''', '''    if (message.type === 'plan') {
-              this.applyIncomingPlan(message.payload)
-              return
-            }
-            if (message.type === 'progress') {
-              this.applyIncomingProgress(message.payload)
-              return
-            }
-            if (message.type === 'progress-ack') {'''),
-            ('''  applyProgressAck(payload) {
-            payload = payload || {}
-            if (this.screen !== 'complete') {
-              return
-            }
-            if (String(payload.workoutId || '') !== String(WORKOUT.id || '') ||
-                String(payload.revision || '') !== String(WORKOUT.revision || '')) {
-              return
-            }
-            this.completionSynced = true
-            this.refreshDoneStatus()
-            this.saveState()
-          },
-
-          applyIncomingPlan(payload) {''', '''  applyProgressAck(payload) {
+          replacement = '''  applyProgressAck(payload) {
             payload = payload || {}
             if (String(payload.workoutId || '') !== String(WORKOUT.id || '') ||
                 String(payload.revision || '') !== String(WORKOUT.revision || '')) {
@@ -333,86 +227,34 @@ jobs:
             return null
           },
 
-          applyIncomingPlan(payload) {'''),
-            ('''    var same = protocol.samePlan(WORKOUT, plan)
-            var activeLocalSession = this.completedRecords.length > 0 && this.screen !== 'complete'
-            if (!same && activeLocalSession && WORKOUT.id && WORKOUT.revision) {
-              this.publishProgress()
-              return
-            }
+          applyIncomingPlan(payload) {'''
+          text = sub1(text, r"  applyProgressAck\(payload\) \{.*?\n  \},\n\n  applyIncomingPlan\(payload\) \{", replacement, 'progress handlers')
 
-            if (same) {
-              return
-            }
+          text = sub1(
+              text,
+              r"    var same = protocol\.samePlan\(WORKOUT, plan\)\n    var activeLocalSession = this\.completedRecords\.length > 0 && this\.screen !== 'complete'\n    if \(!same && activeLocalSession && WORKOUT\.id && WORKOUT\.revision\) \{\n      this\.publishProgress\(\)\n      return\n    \}\n\n    if \(same\) \{\n      return\n    \}\n\n    if \(this\.screen === 'complete' && !this\.completionSynced\) \{\n      this\.publishProgress\(\)\n    \}\n\n    WORKOUT = plan",
+              "    var same = protocol.samePlan(WORKOUT, plan)\n    var activeLocalSession = this.completedRecords.length > 0 && this.screen !== 'complete'\n    var unsyncedLocalSession = this.syncPending && WORKOUT.id && WORKOUT.revision\n    if (!same && (activeLocalSession || unsyncedLocalSession)) {\n      this.publishProgress()\n      return\n    }\n\n    if (same) {\n      if (this.syncPending) {\n        this.publishProgress()\n      }\n      return\n    }\n\n    WORKOUT = plan",
+              'plan conflict rule'
+          )
+          text = one(text, "    this.setProgress = this.completedSets + ' / ' + this.totalSets\n    vibrator.vibrate({ mode: 'short' })", "    this.setProgress = this.completedSets + ' / ' + this.totalSets\n    this.markProgressDirty()\n    vibrator.vibrate({ mode: 'short' })", 'complete set dirty')
+          text = one(text, '    this.loadCurrentSet(record.actualWeight, record.actualReps)\n    this.refreshDoneStatus()', '    this.loadCurrentSet(record.actualWeight, record.actualReps)\n    this.markProgressDirty()\n    this.refreshDoneStatus()', 'undo dirty')
+          write('src/pages/index/index.ux', text)
 
-            if (this.screen === 'complete' && !this.completionSynced) {
-              this.publishProgress()
-            }
+          text = read('scripts/check.mjs')
+          marker = 'if (!protocol.includes("lianleme.workout") || !protocol.includes("VERSION = 1")) fail("Workout Protocol V1 marker is missing");'
+          extra = marker + '\nfor (const marker of ["applyIncomingProgress", "progress-ack", "syncPending"]) {\n  if (!page.includes(marker)) fail(`bidirectional wearable sync marker missing: ${marker}`);\n}\nfor (const marker of ["normalizeProgress", "progressMatchesPlan"]) {\n  if (!protocol.includes(marker)) fail(`bidirectional protocol marker missing: ${marker}`);\n}'
+          text = one(text, marker, extra, 'check bidirectional markers')
+          write('scripts/check.mjs', text)
 
-            WORKOUT = plan''', '''    var same = protocol.samePlan(WORKOUT, plan)
-            var activeLocalSession = this.completedRecords.length > 0 && this.screen !== 'complete'
-            var unsyncedLocalSession = this.syncPending && WORKOUT.id && WORKOUT.revision
-            if (!same && (activeLocalSession || unsyncedLocalSession)) {
-              this.publishProgress()
-              return
-            }
-
-            if (same) {
-              if (this.syncPending) {
-                this.publishProgress()
-              }
-              return
-            }
-
-            WORKOUT = plan'''),
-            ('''    this.completedSets = this.completedRecords.length
-            this.canUndo = true
-            this.setProgress = this.completedSets + ' / ' + this.totalSets
-            vibrator.vibrate({ mode: 'short' })''', '''    this.completedSets = this.completedRecords.length
-            this.canUndo = true
-            this.setProgress = this.completedSets + ' / ' + this.totalSets
-            this.markProgressDirty()
-            vibrator.vibrate({ mode: 'short' })'''),
-            ('''    this.loadCurrentSet(record.actualWeight, record.actualReps)
-            this.refreshDoneStatus()
-            vibrator.vibrate({ mode: 'short' })''', '''    this.loadCurrentSet(record.actualWeight, record.actualReps)
-            this.markProgressDirty()
-            this.refreshDoneStatus()
-            vibrator.vibrate({ mode: 'short' })''')
-          ]
-
-          for old, new in changes:
-              if old not in text:
-                  raise SystemExit(f'missing expected index block: {old[:100]!r}')
-              text = text.replace(old, new, 1)
-          index.write_text(text, encoding='utf-8')
-
-          check = Path('scripts/check.mjs')
-          text = check.read_text(encoding='utf-8')
-          old = '''if (!page.includes("@system.app")) fail("Vela workout page must import system.app");
-          if (!protocol.includes("lianleme.workout") || !protocol.includes("VERSION = 1")) fail("Workout Protocol V1 marker is missing");'''
-          new = '''if (!page.includes("@system.app")) fail("Vela workout page must import system.app");
-          if (!protocol.includes("lianleme.workout") || !protocol.includes("VERSION = 1")) fail("Workout Protocol V1 marker is missing");
-          for (const marker of ["applyIncomingProgress", "progress-ack", "syncPending"]) {
-            if (!page.includes(marker)) fail(`bidirectional wearable sync marker missing: ${marker}`);
-          }
-          for (const marker of ["normalizeProgress", "progressMatchesPlan"]) {
-            if (!protocol.includes(marker)) fail(`bidirectional protocol marker missing: ${marker}`);
-          }'''
-          if old not in text:
-              raise SystemExit('missing check marker block')
-          check.write_text(text.replace(old, new, 1), encoding='utf-8')
-
-          readme = Path('README.md')
-          text = readme.read_text(encoding='utf-8')
+          text = read('README.md')
           text = text.replace('当前实机测试基线为 0.3.0：', '当前实机测试基线为 0.4.0：', 1)
           text = text.replace('versionName 0.3.0\nversionCode 9', 'versionName 0.4.0\nversionCode 14', 1)
           text = text.replace('0.3.0 接入手机 ↔ 手环 Workout Protocol V1', '0.4.0 接入手机 ↔ 手环 Workout Protocol V1', 1)
           text = text.replace('当前 0.3.0 已作为首轮真机测试基线冻结。', '当前 0.4.0 已作为双向同步真机测试基线。', 1)
-          marker = '- 完成组、撤销、完成训练后回传 progress snapshot\n'
-          if marker in text and '手机端进度变化同步回手环' not in text:
-              text = text.replace(marker, marker + '- 手机端进度变化同步回手环，并回传 progress-ack\n', 1)
-          readme.write_text(text, encoding='utf-8')
+          bullet = '- 完成组、撤销、完成训练后回传 progress snapshot\n'
+          if bullet in text and '手机端进度变化同步回手环' not in text:
+              text = text.replace(bullet, bullet + '- 手机端进度变化同步回手环，并回传 progress-ack\n', 1)
+          write('README.md', text)
           PY
 
       - name: Remove temporary workflow and commit
