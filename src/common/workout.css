@@ -300,13 +300,13 @@
 
 .rir-screen {
   justify-content: flex-start;
-  padding-top: 30px;
+  padding-top: 10px;
 }
 
 .rir-exercise-name {
   width: 300px;
-  height: 42px;
-  font-size: 31px;
+  height: 38px;
+  font-size: 28px;
   font-weight: bold;
   text-align: center;
   color: #ffffff;
@@ -316,9 +316,9 @@
 
 .rir-title {
   width: 300px;
-  height: 48px;
-  margin-top: 10px;
-  font-size: 38px;
+  height: 44px;
+  margin-top: 4px;
+  font-size: 36px;
   font-weight: bold;
   text-align: center;
   color: #ffffff;
@@ -326,8 +326,8 @@
 
 .rir-hint {
   width: 300px;
-  height: 24px;
-  margin-top: 2px;
+  height: 22px;
+  margin-top: 0px;
   font-size: 16px;
   text-align: center;
   color: #aeb7c3;
@@ -335,8 +335,8 @@
 
 .rir-grid {
   width: 300px;
-  height: 198px;
-  margin-top: 22px;
+  height: 266px;
+  margin-top: 10px;
   flex-direction: column;
   justify-content: space-between;
   align-items: center;
@@ -344,15 +344,15 @@
 
 .rir-row {
   width: 300px;
-  height: 92px;
+  height: 82px;
   flex-direction: row;
   justify-content: space-between;
   align-items: center;
 }
 
 .rir-button {
-  width: 92px;
-  height: 92px;
+  width: 144px;
+  height: 82px;
   border-radius: 20px;
   border-width: 1px;
   border-color: #303844;
@@ -362,7 +362,7 @@
 }
 
 .rir-button-text {
-  width: 84px;
+  width: 132px;
   height: 50px;
   font-size: 38px;
   font-weight: bold;
