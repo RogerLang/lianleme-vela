@@ -1,6 +1,7 @@
 name: Signed Vela RPK
 
 on:
+  pull_request:
   workflow_dispatch:
     inputs:
       confirm:
@@ -18,15 +19,13 @@ concurrency:
 
 jobs:
   build:
-    if: ${{ inputs.confirm && github.ref == 'refs/heads/main' }}
+    if: ${{ github.event_name == 'pull_request' || (inputs.confirm && github.ref == 'refs/heads/main') }}
     runs-on: macos-14
     timeout-minutes: 12
 
     steps:
-      - name: Checkout main
+      - name: Checkout target ref
         uses: actions/checkout@v7
-        with:
-          ref: main
 
       - name: Setup Node.js
         uses: actions/setup-node@v7
