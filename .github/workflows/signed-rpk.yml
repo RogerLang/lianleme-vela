@@ -1,32 +1,37 @@
 name: Signed Vela RPK
 
 on:
+  workflow_run:
+    workflows: ["Vela CI"]
+    types: [completed]
   workflow_dispatch:
-    inputs:
-      confirm:
-        description: "确认使用 Android 发布签名构建互联 RPK"
-        required: true
-        type: boolean
-        default: false
 
 permissions:
   contents: read
 
 concurrency:
-  group: vela-signed-rpk
-  cancel-in-progress: false
+  group: vela-signed-rpk-main
+  cancel-in-progress: true
 
 jobs:
   build:
-    if: ${{ inputs.confirm && github.ref == 'refs/heads/main' }}
+    if: >-
+      ${{
+        github.event_name == 'workflow_dispatch' ||
+        (
+          github.event.workflow_run.conclusion == 'success' &&
+          github.event.workflow_run.head_branch == 'main' &&
+          github.event.workflow_run.event == 'push'
+        )
+      }}
     runs-on: macos-14
     timeout-minutes: 12
 
     steps:
-      - name: Checkout main
+      - name: Checkout tested main commit
         uses: actions/checkout@v7
         with:
-          ref: main
+          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || 'main' }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v7
