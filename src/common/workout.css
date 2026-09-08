@@ -12,7 +12,7 @@
   padding-left: 18px;
   padding-right: 18px;
   padding-top: 10px;
-  padding-bottom: 12px;
+  padding-bottom: 10px;
   flex-direction: column;
   align-items: center;
   background-color: #000000;
@@ -20,33 +20,32 @@
 
 .topbar {
   width: 300px;
-  height: 30px;
+  height: 34px;
   flex-direction: row;
   justify-content: space-between;
   align-items: center;
 }
 
 .brand {
-  font-size: 20px;
+  font-size: 21px;
   font-weight: bold;
   color: #ffffff;
 }
 
 .top-progress {
-  font-size: 12px;
-  color: #68717f;
+  font-size: 14px;
+  color: #9aa5b4;
 }
 
 .screen {
   width: 300px;
-  height: 428px;
+  height: 426px;
   flex-direction: column;
   align-items: center;
 }
 
 .workout-screen {
-  height: 380px;
-  justify-content: space-between;
+  justify-content: flex-start;
 }
 
 .workout-main {
@@ -57,17 +56,17 @@
 
 .workout-context {
   width: 300px;
-  height: 18px;
-  font-size: 12px;
+  height: 22px;
+  font-size: 14px;
   text-align: center;
-  color: #707987;
+  color: #929cab;
 }
 
 .exercise-name {
   width: 300px;
-  height: 40px;
-  margin-top: 4px;
-  font-size: 28px;
+  height: 45px;
+  margin-top: 3px;
+  font-size: 30px;
   font-weight: bold;
   text-align: center;
   color: #ffffff;
@@ -77,55 +76,55 @@
 
 .set-card {
   width: 300px;
-  height: 112px;
-  margin-top: 4px;
+  height: 114px;
+  margin-top: 6px;
   border-radius: 18px;
   border-width: 1px;
-  border-color: #1e242d;
+  border-color: #262d36;
   flex-direction: column;
   justify-content: center;
   align-items: center;
-  background-color: #10141a;
+  background-color: #0f141a;
 }
 
 .set-label {
-  font-size: 13px;
-  color: #8c95a2;
+  font-size: 15px;
+  color: #a7b0bd;
 }
 
 .prescription {
-  width: 276px;
+  width: 280px;
   margin-top: 4px;
-  font-size: 38px;
+  font-size: 40px;
   font-weight: bold;
   text-align: center;
   color: #ffffff;
 }
 
 .rest-hint {
-  margin-top: 5px;
-  font-size: 11px;
-  color: #626c79;
+  margin-top: 6px;
+  font-size: 13px;
+  color: #8f99a8;
 }
 
 .adjust-panel {
   width: 300px;
-  height: 92px;
-  margin-top: 6px;
+  height: 96px;
+  margin-top: 10px;
   padding-left: 9px;
   padding-right: 9px;
-  padding-top: 3px;
-  padding-bottom: 3px;
+  padding-top: 4px;
+  padding-bottom: 4px;
   border-radius: 16px;
   border-width: 1px;
-  border-color: #1b2129;
+  border-color: #252c35;
   flex-direction: column;
-  background-color: #0d1116;
+  background-color: #0c1015;
 }
 
 .adjust-row {
   width: 280px;
-  height: 41px;
+  height: 42px;
   flex-direction: row;
   justify-content: space-between;
   align-items: center;
@@ -137,24 +136,24 @@
 
 .step-button {
   width: 78px;
-  height: 41px;
+  height: 42px;
   border-radius: 14px;
   border-width: 1px;
-  border-color: #252c36;
+  border-color: #303844;
   justify-content: center;
   align-items: center;
   background-color: #171d25;
 }
 
 .step-text {
-  font-size: 15px;
+  font-size: 16px;
   font-weight: bold;
-  color: #c8d0db;
+  color: #d7dde6;
 }
 
 .adjust-value {
   width: 112px;
-  font-size: 18px;
+  font-size: 19px;
   font-weight: bold;
   text-align: center;
   color: #ffffff;
@@ -162,6 +161,7 @@
 
 .workout-action-zone {
   width: 300px;
+  margin-top: 14px;
   flex-direction: column-reverse;
   align-items: center;
 }
@@ -174,7 +174,7 @@
 }
 
 .workout-actions {
-  height: 72px;
+  height: 76px;
 }
 
 .half-action {
@@ -186,38 +186,38 @@
 }
 
 .workout-half-action {
-  height: 72px;
+  height: 76px;
 }
 
 .dark-half-action {
-  border-color: #252c36;
-  background-color: #111722;
+  border-color: #303844;
+  background-color: #151b24;
 }
 
 .light-half-action {
-  border-color: #e4eaf3;
-  background-color: #dce5f2;
+  border-color: #edf1f6;
+  background-color: #e3e9f1;
 }
 
 .half-action-text {
   width: 128px;
-  font-size: 17px;
+  font-size: 18px;
   font-weight: bold;
   text-align: center;
 }
 
 .dark-half-action-text {
-  color: #d4dbe5;
+  color: #e0e5ec;
 }
 
 .light-half-action-text {
-  color: #111827;
+  color: #121820;
 }
 
 .workout-meta-row {
   width: 300px;
-  height: 18px;
-  margin-bottom: 9px;
+  min-height: 24px;
+  margin-bottom: 10px;
   flex-direction: row;
   justify-content: center;
   align-items: center;
@@ -225,13 +225,13 @@
 
 .undo-link {
   margin-right: 18px;
-  font-size: 10px;
-  color: #606976;
+  font-size: 13px;
+  color: #8d97a5;
 }
 
 .next-hint {
-  font-size: 11px;
-  color: #6d7785;
+  font-size: 14px;
+  color: #a2acba;
 }
 
 .rest-screen {
@@ -239,16 +239,16 @@
 }
 
 .rest-title {
-  margin-top: 5px;
-  font-size: 24px;
+  margin-top: 7px;
+  font-size: 25px;
   font-weight: bold;
-  color: #9da6b2;
+  color: #aeb6c1;
 }
 
 .countdown {
   width: 300px;
-  height: 87px;
-  margin-top: 2px;
+  height: 90px;
+  margin-top: 4px;
   font-size: 80px;
   font-weight: bold;
   text-align: center;
@@ -256,15 +256,15 @@
 }
 
 .seconds {
-  margin-top: -5px;
-  font-size: 12px;
-  color: #626c79;
+  margin-top: -3px;
+  font-size: 14px;
+  color: #8f99a8;
 }
 
 .rest-adjust-row {
   width: 300px;
-  height: 48px;
-  margin-top: 8px;
+  height: 50px;
+  margin-top: 10px;
   flex-direction: row;
   justify-content: space-between;
   align-items: center;
@@ -272,43 +272,43 @@
 
 .rest-adjust-button {
   width: 144px;
-  height: 48px;
+  height: 50px;
   border-radius: 15px;
   border-width: 1px;
-  border-color: #1d232b;
+  border-color: #2a313b;
   justify-content: center;
   align-items: center;
-  background-color: #0d1116;
+  background-color: #0f141a;
 }
 
 .rest-adjust-text {
-  font-size: 15px;
+  font-size: 16px;
   font-weight: bold;
-  color: #939daa;
+  color: #b1bac6;
 }
 
 .next-card {
   width: 300px;
-  height: 102px;
-  margin-top: 10px;
+  height: 104px;
+  margin-top: 12px;
   border-radius: 18px;
   border-width: 1px;
-  border-color: #1e242d;
+  border-color: #262d36;
   flex-direction: column;
   justify-content: center;
   align-items: center;
-  background-color: #10141a;
+  background-color: #0f141a;
 }
 
 .next-eyebrow {
-  font-size: 11px;
-  color: #707987;
+  font-size: 13px;
+  color: #929cab;
 }
 
 .next-name {
   width: 270px;
   margin-top: 3px;
-  font-size: 23px;
+  font-size: 24px;
   font-weight: bold;
   text-align: center;
   color: #ffffff;
@@ -319,18 +319,18 @@
 .next-meta {
   width: 270px;
   margin-top: 5px;
-  font-size: 13px;
+  font-size: 14px;
   text-align: center;
-  color: #98a1ad;
+  color: #a7b0bd;
 }
 
 .rest-actions {
-  height: 70px;
-  margin-top: 10px;
+  height: 72px;
+  margin-top: 12px;
 }
 
 .rest-half-action {
-  height: 70px;
+  height: 72px;
 }
 
 .complete-screen {
@@ -342,10 +342,10 @@
   height: 74px;
   border-radius: 37px;
   border-width: 1px;
-  border-color: #252c36;
+  border-color: #303844;
   justify-content: center;
   align-items: center;
-  background-color: #111722;
+  background-color: #151b24;
 }
 
 .done-mark {
@@ -353,7 +353,7 @@
   font-size: 45px;
   font-weight: bold;
   text-align: center;
-  color: #dce5f2;
+  color: #e3e9f1;
 }
 
 .done-title {
@@ -365,28 +365,30 @@
 
 .done-summary {
   margin-top: 7px;
-  font-size: 18px;
-  color: #b3bbc6;
+  font-size: 19px;
+  color: #c2c9d2;
 }
 
 .done-note {
-  margin-top: 5px;
-  font-size: 12px;
-  color: #626c79;
+  width: 290px;
+  margin-top: 7px;
+  font-size: 14px;
+  text-align: center;
+  color: #8f99a8;
 }
 
 .complete-actions {
-  height: 70px;
+  height: 72px;
   margin-top: 27px;
 }
 
 .complete-half-action {
-  height: 70px;
+  height: 72px;
 }
 
 .half-spacer {
   width: 144px;
-  height: 70px;
+  height: 72px;
 }
 
 .restore-screen {
@@ -406,6 +408,6 @@
 
 .restore-text {
   margin-top: 11px;
-  font-size: 14px;
-  color: #707987;
+  font-size: 15px;
+  color: #929cab;
 }
