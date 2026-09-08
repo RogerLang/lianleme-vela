@@ -1,0 +1,53 @@
+name: Vela CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: vela-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: macos-14
+    timeout-minutes: 12
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 20
+
+      - name: Check public Vela project metadata
+        run: npm run check
+
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Build debug RPK
+        run: npm run build
+
+      - name: Verify RPK output
+        shell: bash
+        run: |
+          set -euo pipefail
+          find dist -maxdepth 1 -type f -name '*.rpk' -print
+          test -n "$(find dist -maxdepth 1 -type f -name '*.rpk' -print -quit)"
+
+      - name: Upload debug RPK
+        if: ${{ github.event_name != 'pull_request' }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: lianleme-vela-rpk
+          path: dist/*.rpk
+          if-no-files-found: error
+          retention-days: 3
