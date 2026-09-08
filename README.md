@@ -17,6 +17,12 @@ minPlatformVersion 1200
 
 公开仓库不保存个人训练计划、训练记录、GitHub Token、Android keystore 或 PEM 私钥。
 
+## 长期下载
+
+0.4.0 作为当前 Final 基线发布到 GitHub Releases。Release Assets 中的签名 `.rpk` 用于长期保存与重新安装，不受 Actions artifact 保留时间影响；同时附带 `signing-certificate.txt` 供签名指纹核对。
+
+后续若产生新版本，只有版本号首次出现并完成 `Vela CI → Signed Vela RPK` 后才会创建对应 GitHub Release；已有版本不会被后续构建覆盖。
+
 ## 当前功能
 
 - 当前动作、组进度、重量和次数展示
@@ -106,6 +112,12 @@ designWidth 336
 - 需要在本仓库 Actions secrets 中配置 `ANDROID_KEYSTORE_BASE64`、`ANDROID_KEYSTORE_PASSWORD`、`ANDROID_KEY_ALIAS`。
 - 输出 `lianleme-vela-signed-rpk` artifact，用于手机 ↔ 手环互联与真机测试。
 
+`.github/workflows/release.yml`：
+
+- Signed Vela RPK 成功后读取当前版本号。
+- 若对应 `v<version>` Release 尚未存在，下载刚生成的签名 RPK 并创建永久 GitHub Release。
+- 已经发布过的版本保持原有归档，不会被后续同版本构建替换。
+
 Xiaomi 互联要求 Vela 与 Android 同包名、同签名。普通 debug RPK 可以验证构建和 UI；实际手机 ↔ 手环互联测试应使用同签名 RPK。
 
 ## 维护与发布流程
@@ -117,7 +129,7 @@ PR / main 变更
 → Vela CI
 → main CI 成功
 → Signed Vela RPK 自动构建
-→ 下载 lianleme-vela-signed-rpk
+→ 首次版本自动归档到 GitHub Release
 → 真机安装并完成全流程测试
 ```
 
