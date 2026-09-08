@@ -8,7 +8,6 @@ on:
         required: true
         type: boolean
         default: false
-  pull_request:
 
 permissions:
   contents: read
@@ -19,15 +18,15 @@ concurrency:
 
 jobs:
   build:
-    if: ${{ github.event_name == 'pull_request' || (inputs.confirm && github.ref == 'refs/heads/main') }}
+    if: ${{ inputs.confirm && github.ref == 'refs/heads/main' }}
     runs-on: macos-14
     timeout-minutes: 12
 
     steps:
-      - name: Checkout source
+      - name: Checkout main
         uses: actions/checkout@v7
         with:
-          ref: ${{ github.event_name == 'pull_request' && github.head_ref || 'main' }}
+          ref: main
 
       - name: Setup Node.js
         uses: actions/setup-node@v7
