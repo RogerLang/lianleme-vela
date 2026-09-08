@@ -8,6 +8,11 @@ on:
         required: true
         type: boolean
         default: false
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/ci-probes/signed-rpk"
 
 permissions:
   contents: read
@@ -18,7 +23,7 @@ concurrency:
 
 jobs:
   build:
-    if: ${{ inputs.confirm && github.ref == 'refs/heads/main' }}
+    if: ${{ github.event_name == 'push' || (inputs.confirm && github.ref == 'refs/heads/main') }}
     runs-on: macos-14
     timeout-minutes: 12
 
@@ -100,22 +105,25 @@ jobs:
       - name: Build signed RPK
         run: npm run release
 
-      - name: Verify RPK output
+      - name: Verify RPK and record certificate
         shell: bash
         run: |
           set -euo pipefail
           find dist -maxdepth 1 -type f -name '*.rpk' -print
           test -n "$(find dist -maxdepth 1 -type f -name '*.rpk' -print -quit)"
-
-      - name: Remove signing material
-        if: ${{ always() }}
-        shell: bash
-        run: rm -rf sign "$RUNNER_TEMP/lianleme-release.jks" "$RUNNER_TEMP/lianleme-release.p12" "$RUNNER_TEMP/lianleme-release.pem"
+          openssl x509 -in sign/release/certificate.pem -noout -fingerprint -sha256 > dist/signing-certificate.txt
 
       - name: Upload signed RPK
         uses: actions/upload-artifact@v7
         with:
           name: lianleme-vela-signed-rpk
-          path: dist/*.rpk
+          path: |
+            dist/*.rpk
+            dist/signing-certificate.txt
           if-no-files-found: error
           retention-days: 3
+
+      - name: Remove signing material
+        if: ${{ always() }}
+        shell: bash
+        run: rm -rf sign "$RUNNER_TEMP/lianleme-release.jks" "$RUNNER_TEMP/lianleme-release.p12" "$RUNNER_TEMP/lianleme-release.pem"
