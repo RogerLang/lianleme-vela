@@ -33,8 +33,8 @@
 }
 
 .top-progress {
-  font-size: 14px;
-  color: #9aa5b4;
+  font-size: 15px;
+  color: #a7b0bd;
 }
 
 .screen {
@@ -45,7 +45,7 @@
 }
 
 .workout-screen {
-  justify-content: flex-start;
+  justify-content: center;
 }
 
 .workout-main {
@@ -56,10 +56,10 @@
 
 .workout-context {
   width: 300px;
-  height: 22px;
-  font-size: 14px;
+  height: 24px;
+  font-size: 15px;
   text-align: center;
-  color: #929cab;
+  color: #a1aab7;
 }
 
 .exercise-name {
@@ -88,8 +88,8 @@
 }
 
 .set-label {
-  font-size: 15px;
-  color: #a7b0bd;
+  font-size: 16px;
+  color: #b3bbc6;
 }
 
 .prescription {
@@ -103,8 +103,8 @@
 
 .rest-hint {
   margin-top: 6px;
-  font-size: 13px;
-  color: #8f99a8;
+  font-size: 14px;
+  color: #9ba5b3;
 }
 
 .adjust-panel {
@@ -146,14 +146,14 @@
 }
 
 .step-text {
-  font-size: 16px;
+  font-size: 17px;
   font-weight: bold;
   color: #d7dde6;
 }
 
 .adjust-value {
   width: 112px;
-  font-size: 19px;
+  font-size: 20px;
   font-weight: bold;
   text-align: center;
   color: #ffffff;
@@ -216,7 +216,7 @@
 
 .workout-meta-row {
   width: 300px;
-  min-height: 24px;
+  min-height: 26px;
   margin-bottom: 10px;
   flex-direction: row;
   justify-content: center;
@@ -225,17 +225,17 @@
 
 .undo-link {
   margin-right: 18px;
-  font-size: 13px;
-  color: #8d97a5;
+  font-size: 14px;
+  color: #9ca6b4;
 }
 
 .next-hint {
-  font-size: 14px;
-  color: #a2acba;
+  font-size: 15px;
+  color: #b0b9c5;
 }
 
 .rest-screen {
-  justify-content: flex-start;
+  justify-content: center;
 }
 
 .rest-title {
@@ -257,8 +257,8 @@
 
 .seconds {
   margin-top: -3px;
-  font-size: 14px;
-  color: #8f99a8;
+  font-size: 15px;
+  color: #9ba5b3;
 }
 
 .rest-adjust-row {
@@ -282,9 +282,9 @@
 }
 
 .rest-adjust-text {
-  font-size: 16px;
+  font-size: 17px;
   font-weight: bold;
-  color: #b1bac6;
+  color: #bdc5cf;
 }
 
 .next-card {
@@ -301,8 +301,8 @@
 }
 
 .next-eyebrow {
-  font-size: 13px;
-  color: #929cab;
+  font-size: 14px;
+  color: #a1aab7;
 }
 
 .next-name {
@@ -319,9 +319,9 @@
 .next-meta {
   width: 270px;
   margin-top: 5px;
-  font-size: 14px;
+  font-size: 15px;
   text-align: center;
-  color: #a7b0bd;
+  color: #b3bbc6;
 }
 
 .rest-actions {
@@ -372,9 +372,9 @@
 .done-note {
   width: 290px;
   margin-top: 7px;
-  font-size: 14px;
+  font-size: 15px;
   text-align: center;
-  color: #8f99a8;
+  color: #9ba5b3;
 }
 
 .complete-actions {
@@ -408,6 +408,6 @@
 
 .restore-text {
   margin-top: 11px;
-  font-size: 15px;
-  color: #929cab;
+  font-size: 16px;
+  color: #a1aab7;
 }
