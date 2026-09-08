@@ -117,13 +117,13 @@
           <text if="{{ doneStatusDetail }}" class="done-status-detail">{{ doneStatusDetail }}</text>
         </div>
 
-        <div if="{{ !completionConfirmed }}" class="action-row complete-actions">
-          <div if="{{ canUndo }}" class="half-action complete-half-action dark-half-action" onclick="undoLastSet">
+        <div class="action-row complete-actions">
+          <div if="{{ canUndo && !completionConfirmed }}" class="half-action complete-half-action dark-half-action" onclick="undoLastSet">
             <text class="half-action-text dark-half-action-text">撤销最后一组</text>
           </div>
           <div else class="half-spacer"></div>
           <div class="half-action complete-half-action light-half-action" onclick="confirmWorkoutComplete">
-            <text class="half-action-text light-half-action-text">完成</text>
+            <text class="half-action-text light-half-action-text">{{ completionConfirmed ? '退出' : '完成' }}</text>
           </div>
         </div>
       </div>
@@ -140,6 +140,7 @@
 import storage from '@system.storage'
 import vibrator from '@system.vibrator'
 import interconnect from '@system.interconnect'
+import app from '@system.app'
 import protocol from '../../common/workout-protocol.js'
 
 var PLAN_KEY = 'lianleme.workout.plan.v1'
@@ -897,7 +898,6 @@ export default {
     this.syncRestRemaining()
     this.saveState()
   },
-
   skipRest() {
     if (this.screen !== 'rest') {
       return
@@ -968,15 +968,24 @@ export default {
   },
 
   confirmWorkoutComplete() {
-    if (this.screen !== 'complete' || this.completionConfirmed) {
+    if (this.screen !== 'complete') {
       return
     }
-    this.completionConfirmed = true
-    this.saveState()
-    if (!this.completionSynced) {
-      this.publishProgress()
+    if (!this.completionConfirmed) {
+      this.completionConfirmed = true
+      this.saveState()
+      if (!this.completionSynced) {
+        this.publishProgress()
+      }
+      vibrator.vibrate({ mode: 'short' })
     }
-    vibrator.vibrate({ mode: 'short' })
+    setTimeout(function() {
+      try {
+        app.terminate()
+      } catch (error) {
+        console.log('Vela app terminate failed: ' + error)
+      }
+    }, 120)
   }
 }
 </script>

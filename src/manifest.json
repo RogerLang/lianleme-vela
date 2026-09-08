@@ -17,6 +17,9 @@
     },
     {
       "name": "system.interconnect"
+    },
+    {
+      "name": "system.app"
     }
   ],
   "config": {
