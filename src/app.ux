@@ -1,10 +1,43 @@
 <script>
+import interconnect from '@system.interconnect'
+
+var interconnectDiagnosisInFlight = false
+
+function diagnoseInterconnect() {
+  if (interconnectDiagnosisInFlight) {
+    return
+  }
+
+  var conn = interconnect.instance()
+  if (!conn || typeof conn.diagnosis !== 'function') {
+    return
+  }
+
+  interconnectDiagnosisInFlight = true
+  conn.diagnosis({
+    timeout: 10000,
+    success: function(data) {
+      interconnectDiagnosisInFlight = false
+      console.log('Vela interconnect diagnosis status: ' + (data && data.status))
+    },
+    fail: function(data, code) {
+      interconnectDiagnosisInFlight = false
+      console.log('Vela interconnect diagnosis failed: ' + code)
+    }
+  })
+}
+
 export default {
   onCreate() {
-    console.log("练了么 Vela band app created")
+    console.log('练了么 Vela band app created')
+    diagnoseInterconnect()
+  },
+  onShow() {
+    diagnoseInterconnect()
   },
   onDestroy() {
-    console.log("练了么 Vela band app destroyed")
+    interconnectDiagnosisInFlight = false
+    console.log('练了么 Vela band app destroyed')
   }
 }
 </script>
