@@ -4,7 +4,7 @@
 
 ## 当前基线
 
-0.3.0 开始接入手机 ↔ 手环 Workout Protocol V1：
+当前实机测试基线为 0.3.0：
 
 ```text
 versionName 0.3.0
@@ -13,7 +13,7 @@ package io.github.rogerlang.lianleme
 minPlatformVersion 1200
 ```
 
-包名与 Android `io.github.rogerlang.lianleme` 对齐，这是 Xiaomi `system.interconnect` 的要求。0.2.5 及更早版本使用 `com.rogerlang.lianleme.vela`，第一次安装 0.3.0 真机包前需要先卸载旧包。
+0.3.0 接入手机 ↔ 手环 Workout Protocol V1，并完成训练、调整、休息与训练结束四个主要界面。包名与 Android `io.github.rogerlang.lianleme` 对齐，这是 Xiaomi `system.interconnect` 的要求。0.2.5 及更早版本使用 `com.rogerlang.lianleme.vela`，第一次安装 0.3.0 真机包前需要先卸载旧包。
 
 公开仓库不保存个人训练计划、训练记录、GitHub Token、Android keystore 或 PEM 私钥。
 
@@ -22,17 +22,21 @@ minPlatformVersion 1200
 - 当前动作、组进度、重量和次数展示
 - 双列主操作按钮
 - 完成本组
-- 重量 / 次数临时调整
+- 独立重量 / 次数调整页
 - 组间休息倒计时
 - `−15 秒 / +15 秒`
-- 撤销上一组
+- 休息页撤销上一组
 - 跳过休息
+- 训练结束页撤销最后一组
+- 训练完成后保存最终状态并退出应用
+- 未同步完成记录保存在手环，连接后继续补发
 - 本地状态恢复
+- 演示训练完成确认后，下次启动自动回到第 1 组
 - 绝对时间休息校时
 - 完成组、休息结束与训练完成震动反馈
 - Xiaomi `system.interconnect` 双向通道
 - 从 Android 接收并持久化 Planned Workout
-- 完成组、撤销、重开、完成训练后回传 progress snapshot
+- 完成组、撤销、完成训练后回传 progress snapshot
 - 断连期间继续训练，连接恢复后补发当前 progress snapshot
 
 如果手机端暂时没有可用计划，手环保留公开演示计划作为开发 fallback。
@@ -55,7 +59,7 @@ V1 采用 workout / progress 快照：
 要求 Node.js 20。
 
 ```bash
-npm install
+npm ci
 npm run check
 npm run build
 ```
@@ -86,6 +90,7 @@ designWidth 336
 - Pull Request：metadata 检查 + macOS 真构建 RPK。
 - `main`：检查、构建并上传 debug RPK artifact。
 - `workflow_dispatch`：可手动构建 debug artifact。
+- 依赖安装使用 `npm ci`，严格按 `package-lock.json` 构建。
 
 `.github/workflows/signed-rpk.yml`：
 
@@ -93,8 +98,23 @@ designWidth 336
 - 使用与 Android 正式 APK 相同的 keystore 派生 `private.pem` / `certificate.pem`。
 - 签名文件只存在于 Actions 临时环境，构建后立即删除。
 - 需要在本仓库 Actions secrets 中配置 `ANDROID_KEYSTORE_BASE64`、`ANDROID_KEYSTORE_PASSWORD`、`ANDROID_KEY_ALIAS`。
+- 输出 `lianleme-vela-signed-rpk` artifact，用于手机 ↔ 手环互联与真机测试。
 
-Xiaomi 互联要求 Vela 与 Android 同包名、同签名。普通 debug RPK 可以验证构建和 UI；实际手机 ↔ 手环互联测试必须使用同签名 RPK。
+Xiaomi 互联要求 Vela 与 Android 同包名、同签名。普通 debug RPK 可以验证构建和 UI；实际手机 ↔ 手环互联测试应使用同签名 RPK。
+
+## 发布前检查
+
+当前 0.3.0 已作为首轮真机测试基线冻结。发布前只做构建、签名与真机验收，不再进行大范围代码重构。
+
+建议顺序：
+
+```text
+npm ci
+npm run check
+npm run build
+GitHub Actions → Signed Vela RPK → Run workflow → confirm
+真机安装并完成全流程测试
+```
 
 ## 数据边界
 
