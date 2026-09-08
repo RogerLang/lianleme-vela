@@ -121,8 +121,6 @@ PR / main 变更
 → 真机安装并完成全流程测试
 ```
 
-版本记录见 [`CHANGELOG.md`](CHANGELOG.md)。
-
 ## 数据边界
 
 手机端负责 Template、Candidate Workout、Planned Workout、WorkoutSession、Session、GitHub 同步和长期数据。
