@@ -57,6 +57,16 @@ for (const required of ["node_modules", "dist", "src/common/icon.png"]) {
 if (!page.includes("@system.interconnect")) fail("Vela workout page must import system.interconnect");
 if (!page.includes("conn.diagnosis") || !page.includes("connectionDiagnosis")) fail("Vela workout page must surface system.interconnect diagnosis");
 if (!protocol.includes("lianleme.workout") || !protocol.includes("VERSION = 1")) fail("Workout Protocol V1 marker is missing");
+if (page.includes("DEMO_WORKOUT") || page.includes("演示训练")) fail("release Vela app must not fall back to a demo workout");
+for (const marker of ["request-plan", "progress-ack", "syncPending", "applyIncomingProgress", "progressUpdatedAt"]) {
+  if (!page.includes(marker)) fail(`offline-first wearable sync marker missing: ${marker}`);
+}
+for (const marker of ["normalizeProgress", "progressMatchesPlan"]) {
+  if (!protocol.includes(marker)) fail(`bidirectional protocol helper missing: ${marker}`);
+}
+if (!page.includes("onHide()") || !page.includes("onDestroy()") || !page.includes("resumeFromLifecycle()")) {
+  fail("Vela lifecycle recovery hooks are incomplete");
+}
 
 for (const publicText of [page, protocol, exists(specPath) ? read(specPath) : ""]) {
   if (publicText.includes("github_pat_") || publicText.includes("Authorization:") || publicText.includes("fitness-data-private")) {
