@@ -324,10 +324,10 @@
 
 .seconds {
   position: absolute;
-  left: 202px;
-  top: 112px;
+  left: 208px;
+  top: 114px;
   width: 26px;
-  height: 22px;
+  height: 20px;
   font-size: 15px;
   text-align: left;
   color: #9ba5b3;
