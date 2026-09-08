@@ -1,6 +1,6 @@
 <template>
   <div class="page">
-    <div if="{{ ready }}" class="app-shell">
+    <div if="{{ ready && hasPlan }}" class="app-shell">
       <div class="topbar">
         <text class="brand">练了么</text>
         <text if="{{ screen === 'workout' }}" class="top-progress">{{ connectionLabel }} · {{ setProgress }}</text>
@@ -92,6 +92,14 @@
       </div>
     </div>
 
+    <div elif="{{ ready }}" class="restore-screen no-plan-screen">
+      <text class="restore-brand">练了么</text>
+      <text class="no-plan-title">暂无训练计划</text>
+      <text class="restore-text">{{ connectionLabel }}</text>
+      <text class="no-plan-hint">打开手机练了么后会自动获取当前计划</text>
+      <div class="no-plan-action" onclick="requestPlan"><text class="no-plan-action-text">重新获取</text></div>
+    </div>
+
     <div else class="restore-screen">
       <text class="restore-brand">练了么</text>
       <text class="restore-text">正在恢复训练状态</text>
@@ -108,50 +116,17 @@ import protocol from '../../common/workout-protocol.js'
 var PLAN_KEY = 'lianleme.workout.plan.v1'
 var STATE_KEY = 'lianleme.workout.state.v3'
 var STATE_VERSION = 3
-var APP_VERSION = '0.3.1'
+var APP_VERSION = '0.4.0'
 
-var DEMO_WORKOUT = {
+var EMPTY_WORKOUT = {
   id: '',
   revision: '',
   planId: '',
-  name: '演示训练',
-  exercises: [
-    {
-      exerciseId: 'demo-a',
-      name: '动作 A',
-      restSeconds: 60,
-      loadType: 'weighted',
-      sets: [
-        { weight: 20, reps: 8 },
-        { weight: 20, reps: 8 },
-        { weight: 20, reps: 8 }
-      ]
-    },
-    {
-      exerciseId: 'demo-b',
-      name: '动作 B',
-      restSeconds: 45,
-      loadType: 'weighted',
-      sets: [
-        { weight: 12.5, reps: 10 },
-        { weight: 12.5, reps: 10 },
-        { weight: 12.5, reps: 10 }
-      ]
-    },
-    {
-      exerciseId: 'demo-c',
-      name: '动作 C',
-      restSeconds: 30,
-      loadType: 'weighted',
-      sets: [
-        { weight: 10, reps: 12 },
-        { weight: 10, reps: 12 }
-      ]
-    }
-  ]
+  name: '',
+  exercises: []
 }
 
-var WORKOUT = DEMO_WORKOUT
+var WORKOUT = EMPTY_WORKOUT
 
 function nowMs() {
   return new Date().getTime()
@@ -186,8 +161,9 @@ function formatPrescription(weight, reps) {
 
 function countSets() {
   var total = 0
-  for (var i = 0; i < WORKOUT.exercises.length; i++) {
-    total += WORKOUT.exercises[i].sets.length
+  var exercises = WORKOUT && Array.isArray(WORKOUT.exercises) ? WORKOUT.exercises : []
+  for (var i = 0; i < exercises.length; i++) {
+    total += exercises[i].sets.length
   }
   return total
 }
@@ -196,16 +172,21 @@ function validSetIndex(exerciseIndex, setIndex) {
   if (typeof exerciseIndex !== 'number' || typeof setIndex !== 'number') {
     return false
   }
-  if (exerciseIndex < 0 || exerciseIndex >= WORKOUT.exercises.length) {
+  if (!WORKOUT || !Array.isArray(WORKOUT.exercises) || exerciseIndex < 0 || exerciseIndex >= WORKOUT.exercises.length) {
     return false
   }
   var exercise = WORKOUT.exercises[exerciseIndex]
   return setIndex >= 0 && setIndex < exercise.sets.length
 }
 
+function recordKey(exerciseIndex, setIndex) {
+  return String(exerciseIndex) + ':' + String(setIndex)
+}
+
 export default {
   private: {
     ready: false,
+    hasPlan: false,
     screen: 'workout',
     editing: false,
     editToggleText: '调整本组',
@@ -237,6 +218,9 @@ export default {
     connectionReady: false,
     connectionDiagnosis: -1,
     connectionLabel: '离线',
+    syncPending: false,
+    progressUpdatedAt: 0,
+    lastAckUpdatedAt: 0,
     doneNote: '记录保存在手环，连接后同步'
   },
 
@@ -261,7 +245,9 @@ export default {
       return
     }
     this.stopRestTimer()
-    this.saveState()
+    if (this.hasPlan) {
+      this.saveState()
+    }
   },
 
   onDestroy() {
@@ -269,7 +255,9 @@ export default {
       return
     }
     this.stopRestTimer()
-    this.saveState()
+    if (this.hasPlan) {
+      this.saveState()
+    }
   },
 
   restorePlan() {
@@ -278,11 +266,14 @@ export default {
       key: PLAN_KEY,
       default: '',
       success: function(data) {
+        WORKOUT = EMPTY_WORKOUT
+        that.hasPlan = false
         if (data) {
           try {
             var plan = protocol.normalizePlan(JSON.parse(data))
-            if (plan) {
+            if (plan && plan.id && plan.revision) {
               WORKOUT = plan
+              that.hasPlan = true
             }
           } catch (error) {
             console.log('Vela workout plan parse failed: ' + error)
@@ -293,8 +284,9 @@ export default {
       },
       fail: function(data, code) {
         console.log('Vela workout plan read failed: ' + code)
-        WORKOUT = DEMO_WORKOUT
-        that.totalSets = countSets()
+        WORKOUT = EMPTY_WORKOUT
+        that.hasPlan = false
+        that.totalSets = 0
         that.restoreState()
       }
     })
@@ -302,6 +294,12 @@ export default {
 
   restoreState() {
     var that = this
+    if (!this.hasPlan) {
+      this.ready = true
+      this.setupInterconnect()
+      return
+    }
+
     storage.get({
       key: STATE_KEY,
       default: '',
@@ -315,7 +313,7 @@ export default {
           }
         }
         if (!restored) {
-          that.resetWorkoutState()
+          that.resetWorkoutState(false)
         }
         that.ready = true
         that.resumeFromLifecycle()
@@ -323,7 +321,7 @@ export default {
       },
       fail: function(data, code) {
         console.log('Vela workout state read failed: ' + code)
-        that.resetWorkoutState()
+        that.resetWorkoutState(false)
         that.ready = true
         that.resumeFromLifecycle()
         that.setupInterconnect()
@@ -332,7 +330,7 @@ export default {
   },
 
   applyStoredState(state) {
-    if (!state || state.stateVersion !== STATE_VERSION) {
+    if (!state || state.stateVersion !== STATE_VERSION || !this.hasPlan) {
       return false
     }
     if (String(state.workoutId || '') !== String(WORKOUT.id || '') ||
@@ -357,6 +355,11 @@ export default {
     this.completedSets = this.completedRecords.length
     this.canUndo = this.completedSets > 0
     this.restEndAt = typeof state.restEndAt === 'number' ? state.restEndAt : 0
+    this.progressUpdatedAt = Number(state.progressUpdatedAt || state.updatedAt) || nowMs()
+    this.lastAckUpdatedAt = Number(state.lastAckUpdatedAt) || 0
+    this.syncPending = typeof state.syncPending === 'boolean'
+      ? state.syncPending
+      : (this.completedRecords.length > 0 || this.screen === 'complete')
     this.editing = false
     this.editToggleText = '调整本组'
 
@@ -374,11 +377,14 @@ export default {
       this.refreshRestPreview()
       this.syncRestRemaining()
     }
-
+    this.refreshDoneNote()
     return true
   },
 
   currentStateSnapshot() {
+    if (!this.hasPlan) {
+      return null
+    }
     return {
       stateVersion: STATE_VERSION,
       workoutId: String(WORKOUT.id || ''),
@@ -392,12 +398,24 @@ export default {
       currentReps: this.currentReps,
       completedRecords: this.completedRecords,
       restEndAt: this.restEndAt,
-      updatedAt: nowMs()
+      updatedAt: this.progressUpdatedAt || nowMs(),
+      progressUpdatedAt: this.progressUpdatedAt || nowMs(),
+      syncPending: this.syncPending,
+      lastAckUpdatedAt: this.lastAckUpdatedAt
     }
+  },
+
+  markProgressDirty() {
+    this.progressUpdatedAt = nowMs()
+    this.syncPending = true
+    this.refreshDoneNote()
   },
 
   saveState() {
     var state = this.currentStateSnapshot()
+    if (!state) {
+      return null
+    }
     storage.set({
       key: STATE_KEY,
       value: JSON.stringify(state),
@@ -409,6 +427,9 @@ export default {
   },
 
   persistPlan() {
+    if (!this.hasPlan) {
+      return
+    }
     storage.set({
       key: PLAN_KEY,
       value: JSON.stringify(WORKOUT),
@@ -418,7 +439,7 @@ export default {
     })
   },
 
-  resetWorkoutState() {
+  resetWorkoutState(markDirty) {
     this.stopRestTimer()
     this.screen = 'workout'
     this.editing = false
@@ -433,7 +454,12 @@ export default {
     this.canUndo = false
     this.restRemaining = 0
     this.restEndAt = 0
-    this.loadCurrentSet()
+    this.progressUpdatedAt = nowMs()
+    this.syncPending = !!markDirty
+    if (this.hasPlan && validSetIndex(0, 0)) {
+      this.loadCurrentSet()
+    }
+    this.refreshDoneNote()
   },
 
   setupInterconnect() {
@@ -524,7 +550,19 @@ export default {
     } else {
       this.connectionLabel = '离线'
     }
-    this.doneNote = this.connectionReady ? '训练记录已发送到手机' : '记录保存在手环，连接后同步'
+    this.refreshDoneNote()
+  },
+
+  refreshDoneNote() {
+    if (!this.hasPlan) {
+      this.doneNote = '等待手机同步训练计划'
+    } else if (this.syncPending) {
+      this.doneNote = this.connectionReady ? '正在同步训练记录' : '记录保存在手环，连接后同步'
+    } else if (this.completedSets > 0 || this.screen === 'complete') {
+      this.doneNote = '训练记录已同步到手机'
+    } else {
+      this.doneNote = this.connectionReady ? '手机已连接' : '可离线完成本次训练'
+    }
   },
 
   sendEnvelope(type, payload) {
@@ -541,6 +579,19 @@ export default {
     return true
   },
 
+  requestPlan() {
+    if (!this.connectionReady) {
+      this.diagnoseConnection()
+      return
+    }
+    this.sendEnvelope('request-plan', {
+      appVersion: APP_VERSION,
+      planId: String(WORKOUT.planId || ''),
+      workoutId: String(WORKOUT.id || ''),
+      revision: String(WORKOUT.revision || '')
+    })
+  },
+
   sendHelloAndProgress() {
     if (!this.connectionReady) {
       return
@@ -551,15 +602,20 @@ export default {
       workoutId: String(WORKOUT.id || ''),
       revision: String(WORKOUT.revision || '')
     })
-    this.publishProgress()
+    this.requestPlan()
+    if (this.hasPlan) {
+      this.publishProgress()
+    }
   },
 
   publishProgress() {
-    if (!WORKOUT.id || !WORKOUT.revision) {
-      return
+    if (!this.hasPlan || !WORKOUT.id || !WORKOUT.revision) {
+      return false
     }
     var state = this.currentStateSnapshot()
-    this.sendEnvelope('progress', protocol.progressPayload(WORKOUT, state))
+    var sent = this.sendEnvelope('progress', protocol.progressPayload(WORKOUT, state))
+    this.refreshDoneNote()
+    return sent
   },
 
   handleIncomingMessage(raw) {
@@ -569,6 +625,14 @@ export default {
     }
     if (message.type === 'plan') {
       this.applyIncomingPlan(message.payload)
+      return
+    }
+    if (message.type === 'progress') {
+      this.applyIncomingProgress(message.payload)
+      return
+    }
+    if (message.type === 'progress-ack') {
+      this.applyProgressAck(message.payload)
     }
   },
 
@@ -578,28 +642,137 @@ export default {
       return
     }
 
-    var same = protocol.samePlan(WORKOUT, plan)
-    var activeLocalSession = this.completedRecords.length > 0 && this.screen !== 'complete'
-    if (!same && activeLocalSession && WORKOUT.id && WORKOUT.revision) {
+    var same = this.hasPlan && protocol.samePlan(WORKOUT, plan)
+    var activeLocalSession = this.hasPlan && this.completedRecords.length > 0 && this.screen !== 'complete'
+    var unsyncedLocalSession = this.hasPlan && this.syncPending && WORKOUT.id && WORKOUT.revision
+    if (!same && (activeLocalSession || unsyncedLocalSession)) {
       this.publishProgress()
       return
     }
 
     if (same) {
+      if (this.syncPending) {
+        this.publishProgress()
+      }
       return
     }
 
     WORKOUT = plan
+    this.hasPlan = true
     this.persistPlan()
     this.totalSets = countSets()
-    this.resetWorkoutState()
+    this.resetWorkoutState(false)
     this.saveState()
+    this.ready = true
     vibrator.vibrate({ mode: 'short' })
     this.sendEnvelope('ack', { workoutId: WORKOUT.id, revision: WORKOUT.revision })
   },
 
+  applyIncomingProgress(payload) {
+    if (!this.hasPlan) {
+      return
+    }
+    var progress = protocol.normalizeProgress(payload)
+    if (!progress || !protocol.progressMatchesPlan(progress, WORKOUT)) {
+      return
+    }
+
+    if (this.syncPending) {
+      this.publishProgress()
+      return
+    }
+
+    var records = []
+    var completed = {}
+    for (var i = 0; i < progress.completedRecords.length; i++) {
+      var record = progress.completedRecords[i]
+      if (!validSetIndex(record.exerciseIndex, record.setIndex)) {
+        continue
+      }
+      var key = recordKey(record.exerciseIndex, record.setIndex)
+      if (completed[key]) {
+        continue
+      }
+      completed[key] = true
+      records.push(record)
+    }
+
+    var previousCompleted = this.completedRecords.length
+    this.stopRestTimer()
+    this.completedRecords = records
+    this.completedSets = records.length
+    this.canUndo = this.completedSets > 0
+    this.progressUpdatedAt = progress.updatedAt || nowMs()
+    this.lastAckUpdatedAt = this.progressUpdatedAt
+    this.syncPending = false
+    this.restEndAt = 0
+    this.restRemaining = 0
+    this.editing = false
+    this.editToggleText = '调整本组'
+
+    var next = this.firstIncompleteIndices(completed)
+    if (progress.status === 'complete' || !next) {
+      this.screen = 'complete'
+      var lastExerciseIndex = Math.max(0, WORKOUT.exercises.length - 1)
+      var lastSetIndex = Math.max(0, WORKOUT.exercises[lastExerciseIndex].sets.length - 1)
+      this.exerciseIndex = lastExerciseIndex
+      this.setIndex = lastSetIndex
+      this.pendingExerciseIndex = lastExerciseIndex
+      this.pendingSetIndex = lastSetIndex
+      this.loadCurrentSet()
+    } else {
+      this.screen = 'workout'
+      this.exerciseIndex = next.exerciseIndex
+      this.setIndex = next.setIndex
+      this.pendingExerciseIndex = next.exerciseIndex
+      this.pendingSetIndex = next.setIndex
+      this.loadCurrentSet()
+    }
+
+    this.saveState()
+    this.refreshDoneNote()
+    if (this.completedRecords.length !== previousCompleted) {
+      vibrator.vibrate({ mode: 'short' })
+    }
+    this.sendEnvelope('progress-ack', {
+      workoutId: String(WORKOUT.id || ''),
+      revision: String(WORKOUT.revision || ''),
+      planId: String(WORKOUT.planId || ''),
+      updatedAt: this.progressUpdatedAt
+    })
+  },
+
+  applyProgressAck(payload) {
+    payload = payload || {}
+    if (!this.hasPlan ||
+        String(payload.workoutId || '') !== String(WORKOUT.id || '') ||
+        String(payload.revision || '') !== String(WORKOUT.revision || '')) {
+      return
+    }
+    var ackAt = Number(payload.updatedAt) || 0
+    if (ackAt < Number(this.progressUpdatedAt || 0)) {
+      return
+    }
+    this.syncPending = false
+    this.lastAckUpdatedAt = ackAt
+    this.saveState()
+    this.refreshDoneNote()
+  },
+
+  firstIncompleteIndices(completed) {
+    for (var exerciseIndex = 0; exerciseIndex < WORKOUT.exercises.length; exerciseIndex++) {
+      var exercise = WORKOUT.exercises[exerciseIndex]
+      for (var setIndex = 0; setIndex < exercise.sets.length; setIndex++) {
+        if (!completed[recordKey(exerciseIndex, setIndex)]) {
+          return { exerciseIndex: exerciseIndex, setIndex: setIndex }
+        }
+      }
+    }
+    return null
+  },
+
   resumeFromLifecycle() {
-    if (this.screen !== 'rest') {
+    if (!this.hasPlan || this.screen !== 'rest') {
       return
     }
     this.syncRestRemaining()
@@ -611,6 +784,9 @@ export default {
   },
 
   loadCurrentSet(weightOverride, repsOverride) {
+    if (!this.hasPlan || !validSetIndex(this.exerciseIndex, this.setIndex)) {
+      return
+    }
     var set = WORKOUT.exercises[this.exerciseIndex].sets[this.setIndex]
     this.currentWeight = weightOverride === null || typeof weightOverride === 'number' ? weightOverride : set.weight
     this.currentReps = typeof repsOverride === 'number' ? repsOverride : set.reps
@@ -618,8 +794,10 @@ export default {
   },
 
   refreshCurrentDisplay() {
+    if (!this.hasPlan || !validSetIndex(this.exerciseIndex, this.setIndex)) {
+      return
+    }
     var exercise = WORKOUT.exercises[this.exerciseIndex]
-
     this.currentExerciseName = exercise.name
     this.currentSetLabel = '第 ' + (this.setIndex + 1) + ' / ' + exercise.sets.length + ' 组'
     this.currentRestSeconds = exercise.restSeconds
@@ -641,7 +819,6 @@ export default {
       this.nextHint = '完成训练'
       return
     }
-
     if (next.exerciseIndex === this.exerciseIndex) {
       this.nextHint = '第 ' + (next.setIndex + 1) + ' 组'
     } else {
@@ -650,21 +827,16 @@ export default {
   },
 
   getNextIndices() {
+    if (!this.hasPlan || !validSetIndex(this.exerciseIndex, this.setIndex)) {
+      return null
+    }
     var exercise = WORKOUT.exercises[this.exerciseIndex]
     if (this.setIndex + 1 < exercise.sets.length) {
-      return {
-        exerciseIndex: this.exerciseIndex,
-        setIndex: this.setIndex + 1
-      }
+      return { exerciseIndex: this.exerciseIndex, setIndex: this.setIndex + 1 }
     }
-
     if (this.exerciseIndex + 1 < WORKOUT.exercises.length) {
-      return {
-        exerciseIndex: this.exerciseIndex + 1,
-        setIndex: 0
-      }
+      return { exerciseIndex: this.exerciseIndex + 1, setIndex: 0 }
     }
-
     return null
   },
 
@@ -707,7 +879,7 @@ export default {
   },
 
   completeSet() {
-    if (this.screen !== 'workout') {
+    if (!this.hasPlan || this.screen !== 'workout') {
       return
     }
 
@@ -731,6 +903,7 @@ export default {
     this.completedSets = this.completedRecords.length
     this.canUndo = true
     this.setProgress = this.completedSets + ' / ' + this.totalSets
+    this.markProgressDirty()
     vibrator.vibrate({ mode: 'short' })
 
     if (!next) {
@@ -755,9 +928,11 @@ export default {
   },
 
   refreshRestPreview() {
+    if (!validSetIndex(this.pendingExerciseIndex, this.pendingSetIndex)) {
+      return
+    }
     var nextExercise = WORKOUT.exercises[this.pendingExerciseIndex]
     var nextSet = nextExercise.sets[this.pendingSetIndex]
-
     this.nextExerciseName = nextExercise.name
     this.nextSetLabel = '第 ' + (this.pendingSetIndex + 1) + ' / ' + nextExercise.sets.length + ' 组'
     this.nextPrescription = formatPrescription(nextSet.weight, nextSet.reps)
@@ -779,7 +954,6 @@ export default {
       this.finishRest(true)
       return
     }
-
     var that = this
     this.restTimer = setInterval(function() {
       that.syncRestRemaining()
@@ -808,7 +982,6 @@ export default {
     if (this.screen !== 'rest') {
       return
     }
-
     var minimumEnd = nowMs() + 5000
     var nextEnd = this.restEndAt + deltaSeconds * 1000
     this.restEndAt = nextEnd < minimumEnd ? minimumEnd : nextEnd
@@ -827,12 +1000,10 @@ export default {
     if (this.screen !== 'rest') {
       return
     }
-
     this.stopRestTimer()
     if (naturalEnd) {
       vibrator.vibrate({ mode: 'long' })
     }
-
     this.exerciseIndex = this.pendingExerciseIndex
     this.setIndex = this.pendingSetIndex
     this.restEndAt = 0
@@ -862,6 +1033,7 @@ export default {
     this.restEndAt = 0
     this.restRemaining = 0
     this.loadCurrentSet(record.actualWeight, record.actualReps)
+    this.markProgressDirty()
     vibrator.vibrate({ mode: 'short' })
     this.saveState()
     this.publishProgress()
@@ -872,13 +1044,14 @@ export default {
     this.restEndAt = 0
     this.restRemaining = 0
     this.screen = 'complete'
+    this.markProgressDirty()
     this.saveState()
     this.publishProgress()
     vibrator.vibrate({ mode: 'long' })
   },
 
   restartWorkout() {
-    this.resetWorkoutState()
+    this.resetWorkoutState(true)
     this.saveState()
     this.publishProgress()
   }
@@ -887,4 +1060,40 @@ export default {
 
 <style>
 @import '../../common/workout.css';
+
+.no-plan-screen {
+  padding-left: 30px;
+  padding-right: 30px;
+}
+
+.no-plan-title {
+  margin-top: 28px;
+  font-size: 28px;
+  font-weight: 700;
+  color: #111827;
+}
+
+.no-plan-hint {
+  margin-top: 12px;
+  font-size: 16px;
+  line-height: 24px;
+  color: #6b7280;
+  text-align: center;
+}
+
+.no-plan-action {
+  margin-top: 28px;
+  width: 184px;
+  height: 52px;
+  border-radius: 18px;
+  background-color: #111827;
+  justify-content: center;
+  align-items: center;
+}
+
+.no-plan-action-text {
+  color: #ffffff;
+  font-size: 18px;
+  font-weight: 600;
+}
 </style>
