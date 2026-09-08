@@ -55,6 +55,7 @@ for (const required of ["node_modules", "dist", "src/common/icon.png"]) {
 }
 
 if (!page.includes("@system.interconnect")) fail("Vela workout page must import system.interconnect");
+if (!page.includes("conn.diagnosis") || !page.includes("connectionDiagnosis")) fail("Vela workout page must surface system.interconnect diagnosis");
 if (!protocol.includes("lianleme.workout") || !protocol.includes("VERSION = 1")) fail("Workout Protocol V1 marker is missing");
 
 for (const publicText of [page, protocol, exists(specPath) ? read(specPath) : ""]) {
