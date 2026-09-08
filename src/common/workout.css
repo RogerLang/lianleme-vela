@@ -172,6 +172,7 @@
 }
 
 .workout-meta-row {
+  display: none;
   width: 300px;
   min-height: 0px;
   margin-bottom: 8px;
