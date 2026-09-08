@@ -94,7 +94,10 @@ designWidth 336
 
 `.github/workflows/signed-rpk.yml`：
 
-- 仅手动运行，并且只允许 `main`。
+- `main` 的 `Vela CI` 成功完成后自动触发签名 RPK 构建，不需要手动点 Run workflow。
+- 自动签名只响应 `main` 的 push CI；Pull Request 不会接触签名 secrets。
+- 自动签名 checkout 的是刚刚通过 CI 的准确 commit SHA，避免主分支后续变化导致构建内容错位。
+- 仍保留 `workflow_dispatch` 作为手动兜底入口。
 - 使用与 Android 正式 APK 相同的 keystore 派生 `private.pem` / `certificate.pem`。
 - 签名文件只存在于 Actions 临时环境，构建后立即删除。
 - 需要在本仓库 Actions secrets 中配置 `ANDROID_KEYSTORE_BASE64`、`ANDROID_KEYSTORE_PASSWORD`、`ANDROID_KEY_ALIAS`。
@@ -106,14 +109,15 @@ Xiaomi 互联要求 Vela 与 Android 同包名、同签名。普通 debug RPK �
 
 当前 0.3.0 已作为首轮真机测试基线冻结。发布前只做构建、签名与真机验收，不再进行大范围代码重构。
 
-建议顺序：
+现在的自动化顺序：
 
 ```text
-npm ci
-npm run check
-npm run build
-GitHub Actions → Signed Vela RPK → Run workflow → confirm
-真机安装并完成全流程测试
+PR / main 变更
+→ Vela CI
+→ main CI 成功
+→ Signed Vela RPK 自动构建
+→ 下载 lianleme-vela-signed-rpk
+→ 真机安装并完成全流程测试
 ```
 
 ## 数据边界
