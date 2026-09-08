@@ -1,0 +1,34 @@
+{
+  "package": "com.rogerlang.lianleme.vela",
+  "name": "练了么",
+  "versionName": "0.2.5",
+  "versionCode": 8,
+  "minPlatformVersion": 1000,
+  "icon": "/common/icon.png",
+  "deviceTypeList": [
+    "watch"
+  ],
+  "features": [
+    {
+      "name": "system.vibrator"
+    },
+    {
+      "name": "system.storage"
+    }
+  ],
+  "config": {
+    "logLevel": "log",
+    "designWidth": 336
+  },
+  "display": {
+    "backgroundColor": "#080A0F"
+  },
+  "router": {
+    "entry": "pages/index",
+    "pages": {
+      "pages/index": {
+        "component": "index"
+      }
+    }
+  }
+}
