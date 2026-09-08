@@ -1,0 +1,1033 @@
+<template>
+  <div class="page">
+    <div if="{{ ready }}" class="app-shell">
+      <div class="topbar">
+        <text class="brand">练了么</text>
+        <text if="{{ screen === 'workout' }}" class="top-progress">{{ setProgress }}</text>
+      </div>
+
+      <div if="{{ screen === 'workout' }}" class="screen workout-screen">
+        <div class="workout-main">
+          <text class="workout-context">{{ workoutProgress }}</text>
+          <text class="exercise-name">{{ currentExerciseName }}</text>
+
+          <div class="set-card">
+            <text class="set-label">{{ currentSetLabel }}</text>
+            <text class="prescription">{{ prescription }}</text>
+            <text class="rest-hint">休息 {{ currentRestSeconds }} 秒</text>
+          </div>
+
+          <div if="{{ editing }}" class="adjust-panel">
+            <div class="adjust-row">
+              <div class="step-button" onclick="decreaseWeight"><text class="step-text">−2.5</text></div>
+              <text class="adjust-value">{{ weightText }}</text>
+              <div class="step-button" onclick="increaseWeight"><text class="step-text">+2.5</text></div>
+            </div>
+            <div class="adjust-row second-adjust-row">
+              <div class="step-button" onclick="decreaseReps"><text class="step-text">−1</text></div>
+              <text class="adjust-value">{{ repsText }}</text>
+              <div class="step-button" onclick="increaseReps"><text class="step-text">+1</text></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="workout-action-zone">
+          <div class="action-row workout-actions">
+            <div class="half-action workout-half-action dark-half-action" onclick="toggleEdit">
+              <text class="half-action-text dark-half-action-text">{{ editToggleText }}</text>
+            </div>
+            <div class="half-action workout-half-action light-half-action" onclick="completeSet">
+              <text class="half-action-text light-half-action-text">完成本组</text>
+            </div>
+          </div>
+
+          <div if="{{ !editing }}" class="workout-meta-row">
+            <text if="{{ canUndo }}" class="undo-link" onclick="undoLastSet">撤销上一组</text>
+            <text class="next-hint">下一组：{{ nextHint }}</text>
+          </div>
+        </div>
+      </div>
+
+      <div elif="{{ screen === 'rest' }}" class="screen rest-screen">
+        <text class="rest-title">休息</text>
+        <text class="countdown">{{ restRemaining }}</text>
+        <text class="seconds">秒</text>
+
+        <div class="rest-adjust-row">
+          <div class="rest-adjust-button" onclick="decreaseRest"><text class="rest-adjust-text">−15 秒</text></div>
+          <div class="rest-adjust-button" onclick="increaseRest"><text class="rest-adjust-text">+15 秒</text></div>
+        </div>
+
+        <div class="next-card">
+          <text class="next-eyebrow">下一组</text>
+          <text class="next-name">{{ nextExerciseName }}</text>
+          <text class="next-meta">{{ nextSetLabel }} · {{ nextPrescription }}</text>
+        </div>
+
+        <div class="action-row rest-actions">
+          <div class="half-action rest-half-action dark-half-action" onclick="undoLastSet">
+            <text class="half-action-text dark-half-action-text">撤销上一组</text>
+          </div>
+          <div class="half-action rest-half-action light-half-action" onclick="skipRest">
+            <text class="half-action-text light-half-action-text">跳过休息</text>
+          </div>
+        </div>
+      </div>
+
+      <div else class="screen complete-screen">
+        <div class="done-mark-box"><text class="done-mark">✓</text></div>
+        <text class="done-title">训练完成</text>
+        <text class="done-summary">共完成 {{ completedSets }} 组</text>
+        <text class="done-note">训练记录已保存在手环本地</text>
+
+        <div class="action-row complete-actions">
+          <div if="{{ canUndo }}" class="half-action complete-half-action dark-half-action" onclick="undoLastSet">
+            <text class="half-action-text dark-half-action-text">撤销最后一组</text>
+          </div>
+          <div else class="half-spacer"></div>
+          <div class="half-action complete-half-action light-half-action" onclick="restartWorkout">
+            <text class="half-action-text light-half-action-text">重新开始</text>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div else class="restore-screen">
+      <text class="restore-brand">练了么</text>
+      <text class="restore-text">正在恢复训练状态</text>
+    </div>
+  </div>
+</template>
+
+<script>
+import storage from '@system.storage'
+import vibrator from '@system.vibrator'
+
+var STATE_KEY = 'lianleme.workout.state.v2'
+var STATE_VERSION = 2
+
+// Public repository demo fixture. Real phone-synced plans will replace this layer later.
+var WORKOUT = {
+  name: '演示训练',
+  exercises: [
+    {
+      name: '动作 A',
+      restSeconds: 60,
+      sets: [
+        { weight: 20, reps: 8 },
+        { weight: 20, reps: 8 },
+        { weight: 20, reps: 8 }
+      ]
+    },
+    {
+      name: '动作 B',
+      restSeconds: 45,
+      sets: [
+        { weight: 12.5, reps: 10 },
+        { weight: 12.5, reps: 10 },
+        { weight: 12.5, reps: 10 }
+      ]
+    },
+    {
+      name: '动作 C',
+      restSeconds: 30,
+      sets: [
+        { weight: 10, reps: 12 },
+        { weight: 10, reps: 12 }
+      ]
+    }
+  ]
+}
+
+function nowMs() {
+  return new Date().getTime()
+}
+
+function formatWeight(value) {
+  if (value % 1 === 0) {
+    return String(value)
+  }
+  return value.toFixed(1)
+}
+
+function countSets() {
+  var total = 0
+  for (var i = 0; i < WORKOUT.exercises.length; i++) {
+    total += WORKOUT.exercises[i].sets.length
+  }
+  return total
+}
+
+function validSetIndex(exerciseIndex, setIndex) {
+  if (typeof exerciseIndex !== 'number' || typeof setIndex !== 'number') {
+    return false
+  }
+  if (exerciseIndex < 0 || exerciseIndex >= WORKOUT.exercises.length) {
+    return false
+  }
+  var exercise = WORKOUT.exercises[exerciseIndex]
+  return setIndex >= 0 && setIndex < exercise.sets.length
+}
+
+export default {
+  private: {
+    ready: false,
+    screen: 'workout',
+    editing: false,
+    editToggleText: '调整本组',
+    exerciseIndex: 0,
+    setIndex: 0,
+    pendingExerciseIndex: 0,
+    pendingSetIndex: 0,
+    completedSets: 0,
+    totalSets: countSets(),
+    completedRecords: [],
+    canUndo: false,
+    currentExerciseName: '',
+    currentSetLabel: '',
+    currentRestSeconds: 0,
+    currentWeight: 0,
+    currentReps: 0,
+    weightText: '',
+    repsText: '',
+    prescription: '',
+    workoutProgress: '',
+    setProgress: '',
+    nextHint: '',
+    restRemaining: 0,
+    restEndAt: 0,
+    nextExerciseName: '',
+    nextSetLabel: '',
+    nextPrescription: '',
+    restTimer: null
+  },
+
+  onInit() {
+    this.restoreState()
+  },
+
+  onShow() {
+    if (!this.ready) {
+      return
+    }
+    this.resumeFromLifecycle()
+  },
+
+  onHide() {
+    if (!this.ready) {
+      return
+    }
+    this.stopRestTimer()
+    this.saveState()
+  },
+
+  onDestroy() {
+    if (!this.ready) {
+      return
+    }
+    this.stopRestTimer()
+    this.saveState()
+  },
+
+  restoreState() {
+    var that = this
+    storage.get({
+      key: STATE_KEY,
+      default: '',
+      success: function(data) {
+        var restored = false
+        if (data) {
+          try {
+            restored = that.applyStoredState(JSON.parse(data))
+          } catch (error) {
+            console.log('Vela workout state parse failed: ' + error)
+          }
+        }
+        if (!restored) {
+          that.resetWorkoutState()
+        }
+        that.ready = true
+        that.resumeFromLifecycle()
+      },
+      fail: function(data, code) {
+        console.log('Vela workout state read failed: ' + code)
+        that.resetWorkoutState()
+        that.ready = true
+        that.resumeFromLifecycle()
+      }
+    })
+  },
+
+  applyStoredState(state) {
+    if (!state || state.stateVersion !== STATE_VERSION) {
+      return false
+    }
+    if (!validSetIndex(state.exerciseIndex, state.setIndex)) {
+      return false
+    }
+
+    this.stopRestTimer()
+    this.screen = state.screen === 'rest' || state.screen === 'complete' ? state.screen : 'workout'
+    this.exerciseIndex = state.exerciseIndex
+    this.setIndex = state.setIndex
+    this.pendingExerciseIndex = validSetIndex(state.pendingExerciseIndex, state.pendingSetIndex)
+      ? state.pendingExerciseIndex
+      : state.exerciseIndex
+    this.pendingSetIndex = validSetIndex(state.pendingExerciseIndex, state.pendingSetIndex)
+      ? state.pendingSetIndex
+      : state.setIndex
+    this.completedRecords = Array.isArray(state.completedRecords) ? state.completedRecords : []
+    this.completedSets = this.completedRecords.length
+    this.canUndo = this.completedSets > 0
+    this.restEndAt = typeof state.restEndAt === 'number' ? state.restEndAt : 0
+    this.editing = false
+    this.editToggleText = '调整本组'
+
+    var plannedSet = WORKOUT.exercises[this.exerciseIndex].sets[this.setIndex]
+    this.currentWeight = typeof state.currentWeight === 'number' ? state.currentWeight : plannedSet.weight
+    this.currentReps = typeof state.currentReps === 'number' ? state.currentReps : plannedSet.reps
+    this.refreshCurrentDisplay()
+
+    if (this.screen === 'rest') {
+      if (!validSetIndex(this.pendingExerciseIndex, this.pendingSetIndex) || this.restEndAt <= 0) {
+        return false
+      }
+      this.refreshRestPreview()
+      this.syncRestRemaining()
+    }
+
+    return true
+  },
+
+  saveState() {
+    var state = {
+      stateVersion: STATE_VERSION,
+      screen: this.screen,
+      exerciseIndex: this.exerciseIndex,
+      setIndex: this.setIndex,
+      pendingExerciseIndex: this.pendingExerciseIndex,
+      pendingSetIndex: this.pendingSetIndex,
+      currentWeight: this.currentWeight,
+      currentReps: this.currentReps,
+      completedRecords: this.completedRecords,
+      restEndAt: this.restEndAt,
+      updatedAt: nowMs()
+    }
+
+    storage.set({
+      key: STATE_KEY,
+      value: JSON.stringify(state),
+      fail: function(data, code) {
+        console.log('Vela workout state save failed: ' + code)
+      }
+    })
+  },
+
+  resetWorkoutState() {
+    this.stopRestTimer()
+    this.screen = 'workout'
+    this.editing = false
+    this.editToggleText = '调整本组'
+    this.exerciseIndex = 0
+    this.setIndex = 0
+    this.pendingExerciseIndex = 0
+    this.pendingSetIndex = 0
+    this.completedRecords = []
+    this.completedSets = 0
+    this.canUndo = false
+    this.restRemaining = 0
+    this.restEndAt = 0
+    this.loadCurrentSet()
+  },
+
+  resumeFromLifecycle() {
+    if (this.screen !== 'rest') {
+      return
+    }
+    this.syncRestRemaining()
+    if (this.restRemaining <= 0) {
+      this.finishRest(true)
+      return
+    }
+    this.startRestTimer()
+  },
+
+  loadCurrentSet(weightOverride, repsOverride) {
+    var set = WORKOUT.exercises[this.exerciseIndex].sets[this.setIndex]
+    this.currentWeight = typeof weightOverride === 'number' ? weightOverride : set.weight
+    this.currentReps = typeof repsOverride === 'number' ? repsOverride : set.reps
+    this.refreshCurrentDisplay()
+  },
+
+  refreshCurrentDisplay() {
+    var exercise = WORKOUT.exercises[this.exerciseIndex]
+
+    this.currentExerciseName = exercise.name
+    this.currentSetLabel = '第 ' + (this.setIndex + 1) + ' / ' + exercise.sets.length + ' 组'
+    this.currentRestSeconds = exercise.restSeconds
+    this.workoutProgress = WORKOUT.name + ' · 动作 ' + (this.exerciseIndex + 1) + ' / ' + WORKOUT.exercises.length
+    this.setProgress = this.completedSets + ' / ' + this.totalSets
+    this.updatePrescription()
+    this.updateNextHint()
+  },
+
+  updatePrescription() {
+    this.weightText = formatWeight(this.currentWeight) + ' kg'
+    this.repsText = this.currentReps + ' 次'
+    this.prescription = this.weightText + ' × ' + this.currentReps
+  },
+
+  updateNextHint() {
+    var next = this.getNextIndices()
+    if (!next) {
+      this.nextHint = '完成训练'
+      return
+    }
+
+    if (next.exerciseIndex === this.exerciseIndex) {
+      this.nextHint = '第 ' + (next.setIndex + 1) + ' 组'
+    } else {
+      this.nextHint = WORKOUT.exercises[next.exerciseIndex].name
+    }
+  },
+
+  getNextIndices() {
+    var exercise = WORKOUT.exercises[this.exerciseIndex]
+    if (this.setIndex + 1 < exercise.sets.length) {
+      return {
+        exerciseIndex: this.exerciseIndex,
+        setIndex: this.setIndex + 1
+      }
+    }
+
+    if (this.exerciseIndex + 1 < WORKOUT.exercises.length) {
+      return {
+        exerciseIndex: this.exerciseIndex + 1,
+        setIndex: 0
+      }
+    }
+
+    return null
+  },
+
+  toggleEdit() {
+    this.editing = !this.editing
+    this.editToggleText = this.editing ? '收起调整' : '调整本组'
+  },
+
+  decreaseWeight() {
+    if (this.currentWeight <= 2.5) {
+      return
+    }
+    this.currentWeight = this.currentWeight - 2.5
+    this.updatePrescription()
+    this.saveState()
+  },
+
+  increaseWeight() {
+    this.currentWeight = this.currentWeight + 2.5
+    this.updatePrescription()
+    this.saveState()
+  },
+
+  decreaseReps() {
+    if (this.currentReps <= 1) {
+      return
+    }
+    this.currentReps = this.currentReps - 1
+    this.updatePrescription()
+    this.saveState()
+  },
+
+  increaseReps() {
+    this.currentReps = this.currentReps + 1
+    this.updatePrescription()
+    this.saveState()
+  },
+
+  completeSet() {
+    if (this.screen !== 'workout') {
+      return
+    }
+
+    var exercise = WORKOUT.exercises[this.exerciseIndex]
+    var plannedSet = exercise.sets[this.setIndex]
+    var next = this.getNextIndices()
+    var record = {
+      exerciseIndex: this.exerciseIndex,
+      setIndex: this.setIndex,
+      plannedWeight: plannedSet.weight,
+      plannedReps: plannedSet.reps,
+      actualWeight: this.currentWeight,
+      actualReps: this.currentReps,
+      completedAt: nowMs()
+    }
+
+    this.editing = false
+    this.editToggleText = '调整本组'
+    this.completedRecords.push(record)
+    this.completedRecords = this.completedRecords.slice(0)
+    this.completedSets = this.completedRecords.length
+    this.canUndo = true
+    this.setProgress = this.completedSets + ' / ' + this.totalSets
+    vibrator.vibrate({ mode: 'short' })
+
+    if (!next) {
+      this.finishWorkout()
+      return
+    }
+
+    this.pendingExerciseIndex = next.exerciseIndex
+    this.pendingSetIndex = next.setIndex
+    this.prepareRestScreen()
+    this.screen = 'rest'
+    this.saveState()
+    this.startRestTimer()
+  },
+
+  prepareRestScreen() {
+    var currentExercise = WORKOUT.exercises[this.exerciseIndex]
+    this.restEndAt = nowMs() + currentExercise.restSeconds * 1000
+    this.refreshRestPreview()
+    this.syncRestRemaining()
+  },
+
+  refreshRestPreview() {
+    var nextExercise = WORKOUT.exercises[this.pendingExerciseIndex]
+    var nextSet = nextExercise.sets[this.pendingSetIndex]
+
+    this.nextExerciseName = nextExercise.name
+    this.nextSetLabel = '第 ' + (this.pendingSetIndex + 1) + ' / ' + nextExercise.sets.length + ' 组'
+    this.nextPrescription = formatWeight(nextSet.weight) + ' kg × ' + nextSet.reps
+  },
+
+  syncRestRemaining() {
+    var remainingMs = this.restEndAt - nowMs()
+    if (remainingMs <= 0) {
+      this.restRemaining = 0
+      return
+    }
+    this.restRemaining = Math.ceil(remainingMs / 1000)
+  },
+
+  startRestTimer() {
+    this.stopRestTimer()
+    this.syncRestRemaining()
+    if (this.restRemaining <= 0) {
+      this.finishRest(true)
+      return
+    }
+
+    var that = this
+    this.restTimer = setInterval(function() {
+      that.syncRestRemaining()
+      if (that.restRemaining <= 0) {
+        that.finishRest(true)
+      }
+    }, 1000)
+  },
+
+  stopRestTimer() {
+    if (this.restTimer !== null) {
+      clearInterval(this.restTimer)
+      this.restTimer = null
+    }
+  },
+
+  decreaseRest() {
+    this.adjustRest(-15)
+  },
+
+  increaseRest() {
+    this.adjustRest(15)
+  },
+
+  adjustRest(deltaSeconds) {
+    if (this.screen !== 'rest') {
+      return
+    }
+
+    var minimumEnd = nowMs() + 5000
+    var nextEnd = this.restEndAt + deltaSeconds * 1000
+    this.restEndAt = nextEnd < minimumEnd ? minimumEnd : nextEnd
+    this.syncRestRemaining()
+    this.saveState()
+  },
+
+  skipRest() {
+    if (this.screen !== 'rest') {
+      return
+    }
+    this.finishRest(false)
+  },
+
+  finishRest(naturalEnd) {
+    if (this.screen !== 'rest') {
+      return
+    }
+
+    this.stopRestTimer()
+    if (naturalEnd) {
+      vibrator.vibrate({ mode: 'long' })
+    }
+
+    this.exerciseIndex = this.pendingExerciseIndex
+    this.setIndex = this.pendingSetIndex
+    this.restEndAt = 0
+    this.restRemaining = 0
+    this.screen = 'workout'
+    this.loadCurrentSet()
+    this.saveState()
+  },
+
+  undoLastSet() {
+    if (!this.completedRecords.length) {
+      return
+    }
+
+    this.stopRestTimer()
+    var record = this.completedRecords[this.completedRecords.length - 1]
+    this.completedRecords = this.completedRecords.slice(0, this.completedRecords.length - 1)
+    this.completedSets = this.completedRecords.length
+    this.canUndo = this.completedSets > 0
+    this.screen = 'workout'
+    this.editing = false
+    this.editToggleText = '调整本组'
+    this.exerciseIndex = record.exerciseIndex
+    this.setIndex = record.setIndex
+    this.pendingExerciseIndex = record.exerciseIndex
+    this.pendingSetIndex = record.setIndex
+    this.restEndAt = 0
+    this.restRemaining = 0
+    this.loadCurrentSet(record.actualWeight, record.actualReps)
+    vibrator.vibrate({ mode: 'short' })
+    this.saveState()
+  },
+
+  finishWorkout() {
+    this.stopRestTimer()
+    this.restEndAt = 0
+    this.restRemaining = 0
+    this.screen = 'complete'
+    this.saveState()
+    vibrator.vibrate({ mode: 'long' })
+  },
+
+  restartWorkout() {
+    this.resetWorkoutState()
+    this.saveState()
+  }
+}
+</script>
+
+<style>
+.page {
+  width: 336px;
+  height: 480px;
+  flex-direction: column;
+  align-items: center;
+  background-color: #080a0f;
+}
+
+.app-shell {
+  width: 336px;
+  height: 480px;
+  padding-left: 18px;
+  padding-right: 18px;
+  padding-top: 11px;
+  padding-bottom: 10px;
+  flex-direction: column;
+  align-items: center;
+  background-color: #080a0f;
+}
+
+.topbar {
+  width: 300px;
+  height: 31px;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.brand {
+  font-size: 21px;
+  font-weight: bold;
+  color: #ffffff;
+}
+
+.top-progress {
+  font-size: 13px;
+  color: #7e899b;
+}
+
+.screen {
+  width: 300px;
+  height: 428px;
+  flex-direction: column;
+  align-items: center;
+}
+
+.workout-screen {
+  justify-content: space-between;
+}
+
+.workout-main {
+  width: 300px;
+  flex-direction: column;
+  align-items: center;
+}
+
+.workout-context {
+  width: 300px;
+  height: 19px;
+  font-size: 13px;
+  text-align: center;
+  color: #748095;
+}
+
+.exercise-name {
+  width: 300px;
+  height: 41px;
+  margin-top: 3px;
+  font-size: 29px;
+  font-weight: bold;
+  text-align: center;
+  color: #ffffff;
+  lines: 1;
+  text-overflow: ellipsis;
+}
+
+.set-card {
+  width: 300px;
+  height: 118px;
+  margin-top: 5px;
+  border-radius: 22px;
+  border-width: 1px;
+  border-color: #202838;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  background-color: #151a24;
+}
+
+.set-label {
+  font-size: 14px;
+  color: #8792a5;
+}
+
+.prescription {
+  width: 276px;
+  margin-top: 5px;
+  font-size: 39px;
+  font-weight: bold;
+  text-align: center;
+  color: #ffffff;
+}
+
+.rest-hint {
+  margin-top: 6px;
+  font-size: 12px;
+  color: #657185;
+}
+
+.adjust-panel {
+  width: 300px;
+  height: 98px;
+  margin-top: 7px;
+  padding-left: 9px;
+  padding-right: 9px;
+  padding-top: 4px;
+  padding-bottom: 4px;
+  border-radius: 19px;
+  border-width: 1px;
+  border-color: #1c2432;
+  flex-direction: column;
+  background-color: #10151e;
+}
+
+.adjust-row {
+  width: 280px;
+  height: 43px;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.second-adjust-row {
+  margin-top: 4px;
+}
+
+.step-button {
+  width: 78px;
+  height: 43px;
+  border-radius: 15px;
+  border-width: 1px;
+  border-color: #2b3546;
+  justify-content: center;
+  align-items: center;
+  background-color: #202837;
+}
+
+.step-text {
+  font-size: 16px;
+  font-weight: bold;
+  color: #cad4e3;
+}
+
+.adjust-value {
+  width: 112px;
+  font-size: 19px;
+  font-weight: bold;
+  text-align: center;
+  color: #ffffff;
+}
+
+.workout-action-zone {
+  width: 300px;
+  flex-direction: column;
+  align-items: center;
+}
+
+.action-row {
+  width: 300px;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.workout-actions {
+  height: 82px;
+}
+
+.half-action {
+  width: 144px;
+  border-radius: 20px;
+  border-width: 1px;
+  justify-content: center;
+  align-items: center;
+}
+
+.workout-half-action {
+  height: 82px;
+}
+
+.dark-half-action {
+  border-color: #2a3445;
+  background-color: #1b2230;
+}
+
+.light-half-action {
+  border-color: #eef4ff;
+  background-color: #dce8ff;
+}
+
+.half-action-text {
+  width: 128px;
+  font-size: 18px;
+  font-weight: bold;
+  text-align: center;
+}
+
+.dark-half-action-text {
+  color: #d7e0ed;
+}
+
+.light-half-action-text {
+  color: #10213d;
+}
+
+.workout-meta-row {
+  width: 300px;
+  height: 23px;
+  margin-top: 5px;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.undo-link {
+  font-size: 11px;
+  color: #606c80;
+}
+
+.next-hint {
+  font-size: 11px;
+  color: #596476;
+}
+
+.rest-screen {
+  justify-content: flex-start;
+}
+
+.rest-title {
+  margin-top: 5px;
+  font-size: 24px;
+  font-weight: bold;
+  color: #aab4c3;
+}
+
+.countdown {
+  width: 300px;
+  height: 87px;
+  margin-top: 2px;
+  font-size: 80px;
+  font-weight: bold;
+  text-align: center;
+  color: #ffffff;
+}
+
+.seconds {
+  margin-top: -5px;
+  font-size: 12px;
+  color: #68758a;
+}
+
+.rest-adjust-row {
+  width: 300px;
+  height: 48px;
+  margin-top: 8px;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.rest-adjust-button {
+  width: 144px;
+  height: 48px;
+  border-radius: 16px;
+  border-width: 1px;
+  border-color: #1b2331;
+  justify-content: center;
+  align-items: center;
+  background-color: #10151d;
+}
+
+.rest-adjust-text {
+  font-size: 15px;
+  font-weight: bold;
+  color: #98a4b7;
+}
+
+.next-card {
+  width: 300px;
+  height: 102px;
+  margin-top: 10px;
+  border-radius: 22px;
+  border-width: 1px;
+  border-color: #202838;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  background-color: #151a24;
+}
+
+.next-eyebrow {
+  font-size: 11px;
+  color: #748095;
+}
+
+.next-name {
+  width: 270px;
+  margin-top: 3px;
+  font-size: 23px;
+  font-weight: bold;
+  text-align: center;
+  color: #ffffff;
+  lines: 1;
+  text-overflow: ellipsis;
+}
+
+.next-meta {
+  width: 270px;
+  margin-top: 5px;
+  font-size: 13px;
+  text-align: center;
+  color: #97a3b5;
+}
+
+.rest-actions {
+  height: 70px;
+  margin-top: 10px;
+}
+
+.rest-half-action {
+  height: 70px;
+}
+
+.complete-screen {
+  justify-content: center;
+}
+
+.done-mark-box {
+  width: 74px;
+  height: 74px;
+  border-radius: 37px;
+  border-width: 1px;
+  border-color: #263246;
+  justify-content: center;
+  align-items: center;
+  background-color: #182231;
+}
+
+.done-mark {
+  width: 74px;
+  font-size: 45px;
+  font-weight: bold;
+  text-align: center;
+  color: #dce8ff;
+}
+
+.done-title {
+  margin-top: 15px;
+  font-size: 30px;
+  font-weight: bold;
+  color: #ffffff;
+}
+
+.done-summary {
+  margin-top: 7px;
+  font-size: 18px;
+  color: #b5c0cf;
+}
+
+.done-note {
+  margin-top: 5px;
+  font-size: 12px;
+  color: #657185;
+}
+
+.complete-actions {
+  height: 70px;
+  margin-top: 27px;
+}
+
+.complete-half-action {
+  height: 70px;
+}
+
+.half-spacer {
+  width: 144px;
+  height: 70px;
+}
+
+.restore-screen {
+  width: 336px;
+  height: 480px;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  background-color: #080a0f;
+}
+
+.restore-brand {
+  font-size: 32px;
+  font-weight: bold;
+  color: #ffffff;
+}
+
+.restore-text {
+  margin-top: 11px;
+  font-size: 14px;
+  color: #748095;
+}
+</style>
