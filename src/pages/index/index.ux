@@ -7,43 +7,76 @@
       </div>
 
       <div if="{{ screen === 'workout' }}" class="screen workout-screen">
-        <div class="workout-main">
-          <text class="workout-context">{{ workoutProgress }}</text>
-          <text class="exercise-name">{{ currentExerciseName }}</text>
+        <div if="{{ !editing }}" class="workout-view">
+          <div class="workout-main">
+            <text class="workout-context">{{ workoutProgress }}</text>
+            <text class="exercise-name">{{ currentExerciseName }}</text>
 
-          <div class="set-card">
-            <text class="set-label">{{ currentSetLabel }}</text>
-            <text class="prescription">{{ prescription }}</text>
-            <text class="rest-hint">休息 {{ currentRestSeconds }} 秒</text>
+            <div class="set-card">
+              <text class="set-label">{{ currentSetLabel }}</text>
+              <text class="prescription">{{ prescription }}</text>
+              <text class="rest-hint">休息 {{ currentRestSeconds }} 秒</text>
+            </div>
           </div>
 
-          <div if="{{ editing }}" class="adjust-panel">
-            <div class="adjust-row">
-              <div class="step-button" onclick="decreaseWeight"><text class="step-text">−2.5</text></div>
-              <text class="adjust-value">{{ weightText }}</text>
-              <div class="step-button" onclick="increaseWeight"><text class="step-text">+2.5</text></div>
+          <div class="workout-action-zone">
+            <div class="action-row workout-actions">
+              <div class="half-action workout-half-action dark-half-action" onclick="toggleEdit">
+                <text class="half-action-text dark-half-action-text">调整本组</text>
+              </div>
+              <div class="half-action workout-half-action light-half-action" onclick="completeSet">
+                <text class="half-action-text light-half-action-text">完成本组</text>
+              </div>
             </div>
-            <div class="adjust-row second-adjust-row">
-              <div class="step-button" onclick="decreaseReps"><text class="step-text">−1</text></div>
-              <text class="adjust-value">{{ repsText }}</text>
-              <div class="step-button" onclick="increaseReps"><text class="step-text">+1</text></div>
+
+            <div class="workout-meta-row">
+              <text if="{{ canUndo }}" class="undo-link" onclick="undoLastSet">撤销上一组</text>
+              <text class="next-hint">下一组：{{ nextHint }}</text>
             </div>
           </div>
         </div>
 
-        <div class="workout-action-zone">
-          <div class="action-row workout-actions">
-            <div class="half-action workout-half-action dark-half-action" onclick="toggleEdit">
-              <text class="half-action-text dark-half-action-text">{{ editToggleText }}</text>
+        <div else class="adjust-screen">
+          <text class="adjust-exercise-name">{{ currentExerciseName }}</text>
+          <text class="adjust-prescription">{{ prescription }}</text>
+
+          <div class="adjust-section">
+            <div class="adjust-heading-row">
+              <text class="adjust-heading">重量</text>
+              <text class="adjust-current">{{ weightText }}</text>
             </div>
-            <div class="half-action workout-half-action light-half-action" onclick="completeSet">
-              <text class="half-action-text light-half-action-text">完成本组</text>
+            <div class="adjust-button-row">
+              <div class="adjust-step-button" onclick="decreaseWeight">
+                <text class="adjust-step-text">−2.5 kg</text>
+              </div>
+              <div class="adjust-step-button" onclick="increaseWeight">
+                <text class="adjust-step-text">+2.5 kg</text>
+              </div>
             </div>
           </div>
 
-          <div if="{{ !editing }}" class="workout-meta-row">
-            <text if="{{ canUndo }}" class="undo-link" onclick="undoLastSet">撤销上一组</text>
-            <text class="next-hint">下一组：{{ nextHint }}</text>
+          <div class="adjust-section adjust-reps-section">
+            <div class="adjust-heading-row">
+              <text class="adjust-heading">次数</text>
+              <text class="adjust-current">{{ repsText }}</text>
+            </div>
+            <div class="adjust-button-row">
+              <div class="adjust-step-button" onclick="decreaseReps">
+                <text class="adjust-step-text">−1 次</text>
+              </div>
+              <div class="adjust-step-button" onclick="increaseReps">
+                <text class="adjust-step-text">+1 次</text>
+              </div>
+            </div>
+          </div>
+
+          <div class="action-row adjust-actions">
+            <div class="half-action adjust-half-action dark-half-action" onclick="cancelEdit">
+              <text class="half-action-text dark-half-action-text">取消</text>
+            </div>
+            <div class="half-action adjust-half-action light-half-action" onclick="confirmEdit">
+              <text class="half-action-text light-half-action-text">完成调整</text>
+            </div>
           </div>
         </div>
       </div>
@@ -209,6 +242,8 @@ export default {
     screen: 'workout',
     editing: false,
     editToggleText: '调整本组',
+    editOriginalWeight: null,
+    editOriginalReps: 0,
     exerciseIndex: 0,
     setIndex: 0,
     pendingExerciseIndex: 0,
@@ -255,6 +290,9 @@ export default {
     if (!this.ready) {
       return
     }
+    if (this.editing) {
+      this.cancelEdit(true)
+    }
     this.stopRestTimer()
     this.saveState()
   },
@@ -262,6 +300,9 @@ export default {
   onDestroy() {
     if (!this.ready) {
       return
+    }
+    if (this.editing) {
+      this.cancelEdit(true)
     }
     this.stopRestTimer()
     this.saveState()
@@ -354,6 +395,8 @@ export default {
     this.restEndAt = typeof state.restEndAt === 'number' ? state.restEndAt : 0
     this.editing = false
     this.editToggleText = '调整本组'
+    this.editOriginalWeight = null
+    this.editOriginalReps = 0
 
     var plannedSet = WORKOUT.exercises[this.exerciseIndex].sets[this.setIndex]
     this.currentWeight = state.currentWeight === null || typeof state.currentWeight === 'number'
@@ -418,6 +461,8 @@ export default {
     this.screen = 'workout'
     this.editing = false
     this.editToggleText = '调整本组'
+    this.editOriginalWeight = null
+    this.editOriginalReps = 0
     this.exerciseIndex = 0
     this.setIndex = 0
     this.pendingExerciseIndex = 0
@@ -617,8 +662,43 @@ export default {
   },
 
   toggleEdit() {
-    this.editing = !this.editing
-    this.editToggleText = this.editing ? '收起调整' : '调整本组'
+    if (this.editing || this.screen !== 'workout') {
+      return
+    }
+    this.editOriginalWeight = this.currentWeight
+    this.editOriginalReps = this.currentReps
+    this.editing = true
+    vibrator.vibrate({ mode: 'short' })
+  },
+
+  cancelEdit(silent) {
+    if (!this.editing) {
+      return
+    }
+    this.currentWeight = this.editOriginalWeight
+    this.currentReps = this.editOriginalReps
+    this.editing = false
+    this.editToggleText = '调整本组'
+    this.editOriginalWeight = null
+    this.editOriginalReps = 0
+    this.updatePrescription()
+    if (silent === true) {
+      return
+    }
+    this.saveState()
+    vibrator.vibrate({ mode: 'short' })
+  },
+
+  confirmEdit() {
+    if (!this.editing) {
+      return
+    }
+    this.editing = false
+    this.editToggleText = '调整本组'
+    this.editOriginalWeight = null
+    this.editOriginalReps = 0
+    this.saveState()
+    vibrator.vibrate({ mode: 'short' })
   },
 
   decreaseWeight() {
@@ -627,7 +707,7 @@ export default {
     }
     this.currentWeight = this.currentWeight - 2.5
     this.updatePrescription()
-    this.saveState()
+    vibrator.vibrate({ mode: 'short' })
   },
 
   increaseWeight() {
@@ -636,7 +716,7 @@ export default {
     }
     this.currentWeight = this.currentWeight + 2.5
     this.updatePrescription()
-    this.saveState()
+    vibrator.vibrate({ mode: 'short' })
   },
 
   decreaseReps() {
@@ -645,13 +725,13 @@ export default {
     }
     this.currentReps = this.currentReps - 1
     this.updatePrescription()
-    this.saveState()
+    vibrator.vibrate({ mode: 'short' })
   },
 
   increaseReps() {
     this.currentReps = this.currentReps + 1
     this.updatePrescription()
-    this.saveState()
+    vibrator.vibrate({ mode: 'short' })
   },
 
   completeSet() {
@@ -674,6 +754,8 @@ export default {
 
     this.editing = false
     this.editToggleText = '调整本组'
+    this.editOriginalWeight = null
+    this.editOriginalReps = 0
     this.completedRecords.push(record)
     this.completedRecords = this.completedRecords.slice(0)
     this.completedSets = this.completedRecords.length
@@ -803,6 +885,8 @@ export default {
     this.screen = 'workout'
     this.editing = false
     this.editToggleText = '调整本组'
+    this.editOriginalWeight = null
+    this.editOriginalReps = 0
     this.exerciseIndex = record.exerciseIndex
     this.setIndex = record.setIndex
     this.pendingExerciseIndex = record.exerciseIndex
