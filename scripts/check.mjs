@@ -75,7 +75,8 @@ for (const marker of [
   "scheduleProgressRetry",
   "stopProgressRetry",
   "saveState(function(saved)",
-  "persistPlan(function(planSaved)"
+  "persistPlan(function(planSaved)",
+  "this.pendingPlan && protocol.samePlan(this.pendingPlan, plan)"
 ]) {
   if (!page.includes(marker)) fail(`bidirectional wearable sync marker missing: ${marker}`);
 }
