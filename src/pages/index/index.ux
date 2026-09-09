@@ -890,6 +890,10 @@ export default {
 
     var same = protocol.samePlan(WORKOUT, plan)
     if (same) {
+      if (this.pendingPlan && protocol.samePlan(this.pendingPlan, plan)) {
+        this.installIncomingPlan(plan, replyTo)
+        return
+      }
       this.sendPlanAck(plan, 'accepted', replyTo, '')
       if (this.syncPending) {
         this.publishProgress()
