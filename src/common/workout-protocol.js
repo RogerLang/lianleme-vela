@@ -84,6 +84,30 @@ function normalizeExercise(value, index) {
   }
 }
 
+function normalizeExerciseMeta(value, index) {
+  value = value || {}
+  return {
+    exerciseIndex: Math.max(0, Math.floor(Number(value.exerciseIndex) || index || 0)),
+    exerciseId: String(value.exerciseId || 'exercise-' + index),
+    name: String(value.name || '动作 ' + (index + 1)),
+    warmup: !!value.warmup,
+    loadType: String(value.loadType || 'weighted')
+  }
+}
+
+function exerciseMetaForWorkout(workout) {
+  var exercises = workout && Array.isArray(workout.exercises) ? workout.exercises : []
+  return exercises.map(function(exercise, index) {
+    return {
+      exerciseIndex: index,
+      exerciseId: String(exercise && exercise.exerciseId || 'exercise-' + index),
+      name: String(exercise && exercise.name || '动作 ' + (index + 1)),
+      warmup: !!(exercise && exercise.warmup),
+      loadType: String(exercise && exercise.loadType || 'weighted')
+    }
+  })
+}
+
 function normalizePlan(value) {
   if (!value || typeof value !== 'object') {
     return null
@@ -107,7 +131,8 @@ function samePlan(left, right) {
     return false
   }
   return String(left.id || '') === String(right.id || '') &&
-    String(left.revision || '') === String(right.revision || '')
+    String(left.revision || '') === String(right.revision || '') &&
+    String(left.planId || '') === String(right.planId || '')
 }
 
 function normalizeProgress(value) {
@@ -115,10 +140,12 @@ function normalizeProgress(value) {
     return null
   }
   var records = Array.isArray(value.completedRecords) ? value.completedRecords : []
+  var exerciseMeta = Array.isArray(value.exerciseMeta) ? value.exerciseMeta : []
   return {
     workoutId: String(value.workoutId || ''),
     revision: String(value.revision || ''),
     planId: String(value.planId || ''),
+    workoutName: String(value.workoutName || value.planName || ''),
     status: value.status === 'complete' || value.status === 'ready' ? value.status : 'active',
     screen: String(value.screen || 'workout'),
     exerciseIndex: Math.max(0, Math.floor(Number(value.exerciseIndex) || 0)),
@@ -127,6 +154,7 @@ function normalizeProgress(value) {
     pendingSetIndex: Math.max(0, Math.floor(Number(value.pendingSetIndex) || 0)),
     restEndAt: Math.max(0, Number(value.restEndAt) || 0),
     updatedAt: Math.max(0, Number(value.updatedAt) || 0),
+    exerciseMeta: exerciseMeta.map(normalizeExerciseMeta),
     completedRecords: records.map(function(record) {
       record = record || {}
       return {
@@ -148,7 +176,8 @@ function progressMatchesPlan(progress, workout) {
     return false
   }
   return String(progress.workoutId || '') === String(workout.id || '') &&
-    String(progress.revision || '') === String(workout.revision || '')
+    String(progress.revision || '') === String(workout.revision || '') &&
+    String(progress.planId || '') === String(workout.planId || '')
 }
 
 function progressPayload(workout, state) {
@@ -157,6 +186,7 @@ function progressPayload(workout, state) {
     workoutId: String(workout && workout.id || ''),
     revision: String(workout && workout.revision || ''),
     planId: String(workout && workout.planId || ''),
+    workoutName: String(workout && workout.name || ''),
     status: state.screen === 'complete' ? 'complete' : ((state.completedRecords || []).length ? 'active' : 'ready'),
     screen: state.screen || 'workout',
     exerciseIndex: Number(state.exerciseIndex) || 0,
@@ -165,6 +195,7 @@ function progressPayload(workout, state) {
     pendingSetIndex: Number(state.pendingSetIndex) || 0,
     restEndAt: Number(state.restEndAt) || 0,
     updatedAt: Number(state.updatedAt) || nowMs(),
+    exerciseMeta: exerciseMetaForWorkout(workout),
     completedRecords: clone(state.completedRecords || [])
   }
 }

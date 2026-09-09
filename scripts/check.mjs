@@ -70,11 +70,17 @@ for (const marker of [
   "status: status || 'accepted'",
   "'deferred'",
   "'active-session'",
-  "'sync-pending'"
+  "'sync-pending'",
+  "PROGRESS_RETRY_MS",
+  "scheduleProgressRetry",
+  "stopProgressRetry",
+  "saveState(function(saved)",
+  "persistPlan(function(planSaved)",
+  "this.pendingPlan && protocol.samePlan(this.pendingPlan, plan)"
 ]) {
   if (!page.includes(marker)) fail(`bidirectional wearable sync marker missing: ${marker}`);
 }
-for (const marker of ["normalizeProgress", "progressMatchesPlan", "actualRir"]) {
+for (const marker of ["normalizeProgress", "progressMatchesPlan", "actualRir", "exerciseMeta", "workoutName", "String(progress.planId || '') === String(workout.planId || '')"]) {
   if (!protocol.includes(marker)) fail(`bidirectional protocol marker missing: ${marker}`);
 }
 for (const marker of ["screen === 'rir'", "selectRir0", "selectRir5", "actualRir", "finishCurrentSet(null)"]) {
@@ -84,7 +90,7 @@ const rirRowCount = (page.match(/class="rir-row"/g) || []).length;
 if (rirRowCount !== 3) fail(`wearable RIR picker must have exactly 3 rows, found ${rirRowCount}`);
 const rirButtonCount = (page.match(/class="rir-button"/g) || []).length;
 if (rirButtonCount !== 6) fail(`wearable RIR picker must have exactly 6 buttons, found ${rirButtonCount}`);
-for (const marker of ["progress` — either direction", "progress-ack", "syncPending", "actualRir", "deferred", "pending plan"]) {
+for (const marker of ["progress` — either direction", "progress-ack", "syncPending", "actualRir", "deferred", "pending plan", "exerciseMeta", "durable", "retry"]) {
   if (!spec.includes(marker)) fail(`Workout Protocol V1 documentation marker missing: ${marker}`);
 }
 
