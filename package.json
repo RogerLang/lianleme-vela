@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "icon": "node scripts/generate-icon.mjs",
-    "check": "npm run icon && node scripts/check.mjs",
+    "check": "npm run icon && node scripts/check.mjs && node scripts/check-modules.mjs",
     "start": "npm run icon && aiot start --watch",
     "build": "npm run icon && aiot build",
     "release": "npm run icon && aiot release"
