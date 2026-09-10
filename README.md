@@ -4,18 +4,20 @@
 
 ## 当前基线
 
-当前源码、正式签名发布与真机验收基线为 0.4.2：
+当前源码与正式签名发布目标为 0.4.5：
 
 ```text
-versionName 0.4.2
-versionCode 16
+versionName 0.4.5
+versionCode 18
 package io.github.rogerlang.lianleme
 minPlatformVersion 1200
 ```
 
-0.4.2 已完成 Xiaomi Smart Band 9 Pro 真机验收。当前已验证训练、调整、休息、完成、震动、退出、Launcher 图标、RIR 0–5、手机 ↔ 手环双向进度同步、断连恢复、最新训练计划下发，以及旧训练进度尚待确认时的新旧计划交接。手机端会安全保留旧 workout 的延后进度并返回 `progress-ack`；手环会暂存最新 incoming plan，待旧训练可以交接后自动应用，避免双方因 workout identity 已切换而互相等待。
+0.4.5 保留 Workout Protocol V1、`lianleme.workout.state.v3` 本地状态结构和现有训练 UI，包含已在真机验证解决的息屏再亮屏后训练卡片上移修复，并完成页面控制器职责拆分：纯训练计算、storage 与 interconnect transport 各自由独立模块负责。
 
-0.4.1 首次加入 RIR 记录；0.4.0 是此前完成全流程真机验证的基线。当前 0.4.2 延续相同包名与签名身份，包名与 Android `io.github.rogerlang.lianleme` 对齐，用于 Xiaomi `system.interconnect` 身份匹配。0.2.5 及更早版本使用 `com.rogerlang.lianleme.vela`，首次迁移到当前包名时需要先卸载旧包。
+当前完整真机回归基线仍为 0.4.2。0.4.2 已完成 Xiaomi Smart Band 9 Pro 真机验收，覆盖训练、调整、休息、完成、震动、退出、Launcher 图标、RIR 0–5、手机 ↔ 手环双向进度同步、断连恢复、最新训练计划下发，以及旧训练进度尚待确认时的新旧计划交接。0.4.3 加入更完整的 durable ACK / retry 与恢复元数据；基于 0.4.3 的息屏布局修复签名包已单独完成真机验证。0.4.5 发布后仍需按完整回归清单重新验收，再更新完整真机基线。
+
+当前版本继续使用与 Android `io.github.rogerlang.lianleme` 对齐的包名与签名身份，用于 Xiaomi `system.interconnect` 身份匹配。0.2.5 及更早版本使用 `com.rogerlang.lianleme.vela`，首次迁移到当前包名时需要先卸载旧包。
 
 公开仓库不保存个人训练计划、训练记录、GitHub Token、Android keystore 或 PEM 私钥。
 
@@ -52,6 +54,7 @@ minPlatformVersion 1200
 - 手机端进度变化同步回手环，并回传 `progress-ack`
 - `actualRir` 作为可选进度字段双向同步
 - 断连期间继续训练，连接恢复后补发当前 progress snapshot
+- 息屏 / 亮屏恢复后保持训练页固定纵向几何
 
 如果手机端暂时没有可用计划，手环保留公开演示计划作为开发 fallback。
 
@@ -69,9 +72,25 @@ V1 采用 workout / progress 快照：
 - 手机训练进度变化后也可发送 `progress`，手环更新到对应组状态。
 - 普通工作组可在 `completedRecords` 中附带可选 `actualRir`。
 - 手机主 wearable bridge 统一处理实时消息与启动队列中的 `progress-ack`。
-- 旧 workout identity 的 progress 不覆盖手机当前训练，会先进入有界延后收件箱，再返回确认。
+- 其他 workout identity 的 progress 不覆盖手机当前训练，会先进入持久化延后收件箱，再返回确认。
 - 重新连接时再次交换当前 progress，补齐断连期间的数据。
-- 当前 workout identity 匹配的 progress 才会修改当前训练会话。
+- `workoutId + revision + planId` 完整 identity 匹配的 progress 才会修改当前训练会话。
+
+## 代码结构
+
+架构说明见 [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)。
+
+当前运行时职责：
+
+```text
+src/pages/index/index.ux
+  ├─ workout-runtime.js     纯训练计算与 state snapshot
+  ├─ workout-store.js       system.storage owner
+  ├─ workout-transport.js   system.interconnect transport owner
+  └─ workout-protocol.js    Workout Protocol V1 owner
+```
+
+`index.ux` 保留页面生命周期、响应式 UI 状态、休息计时、震动与训练流程编排。CI 会阻止 `storage.get / storage.set / interconnect.instance` 重新进入页面控制器，并执行 runtime/store/transport 的可执行模块测试。
 
 ## 本地开发
 
@@ -82,6 +101,8 @@ npm ci
 npm run check
 npm run build
 ```
+
+`npm run check` 会生成图标、执行静态 ownership 检查，并运行 `scripts/check-modules.mjs` 的 runtime/store/transport contract tests。
 
 `npm run build` 会先生成 `src/common/icon.png`，再调用 Xiaomi `aiot-toolkit` 构建 RPK。产物位于 `dist/`。
 
@@ -106,7 +127,7 @@ designWidth 336
 
 `.github/workflows/ci.yml`：
 
-- Pull Request：metadata 检查 + macOS 真构建 RPK。
+- Pull Request：metadata / ownership / module contract 检查 + macOS 真构建 RPK。
 - `main`：检查、构建并上传 debug RPK artifact。
 - `workflow_dispatch`：可手动构建 debug artifact。
 - 依赖安装使用 `npm ci`，严格按 `package-lock.json` 构建。
@@ -125,7 +146,7 @@ designWidth 336
 `.github/workflows/release.yml`：
 
 - Signed Vela RPK 成功后读取当前版本号。
-- 若对应 `v<version>` Release 尚未存在，下载刚生成的签名 RPK并创建永久 GitHub Release。
+- 若对应 `v<version>` Release 尚未存在，下载刚生成的签名 RPK 并创建永久 GitHub Release。
 - 自动 Release 只声明 CI 与正式签名包归档状态，不自动声明真机验收完成。
 - 已经发布过的版本保持原有归档，不会被后续同版本构建替换。
 
