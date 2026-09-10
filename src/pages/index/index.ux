@@ -170,7 +170,7 @@ import transportFactory from '../../common/workout-transport.js'
 var PLAN_KEY = 'lianleme.workout.plan.v1'
 var STATE_KEY = 'lianleme.workout.state.v3'
 var STATE_VERSION = 3
-var APP_VERSION = '0.4.3'
+var APP_VERSION = '0.4.5'
 var PROGRESS_RETRY_MS = 2500
 
 var WORKOUT = runtime.demoWorkout()
