@@ -4,7 +4,7 @@
 
 ## 当前基线
 
-当前源码与正式签名发布目标为 0.4.5：
+当前源码、正式签名发布与完整真机回归基线均为 0.4.5：
 
 ```text
 versionName 0.4.5
@@ -13,9 +13,9 @@ package io.github.rogerlang.lianleme
 minPlatformVersion 1200
 ```
 
-0.4.5 保留 Workout Protocol V1、`lianleme.workout.state.v3` 本地状态结构和现有训练 UI，包含已在真机验证解决的息屏再亮屏后训练卡片上移修复，并完成页面控制器职责拆分：纯训练计算、storage 与 interconnect transport 各自由独立模块负责。
+0.4.5 已完成 Xiaomi Smart Band 9 Pro 真机验收。当前验证覆盖训练、调整、休息、完成、震动、退出、Launcher 图标、RIR 0–5、手机 ↔ 手环双向进度同步、断连恢复、手机 App 进程被强制结束后的进度恢复、最新训练计划下发、新旧计划交接，以及息屏再亮屏后的训练页布局恢复。完成本轮联合回归后未发现新的已知功能问题。
 
-当前完整真机回归基线仍为 0.4.2。0.4.2 已完成 Xiaomi Smart Band 9 Pro 真机验收，覆盖训练、调整、休息、完成、震动、退出、Launcher 图标、RIR 0–5、手机 ↔ 手环双向进度同步、断连恢复、最新训练计划下发，以及旧训练进度尚待确认时的新旧计划交接。0.4.3 加入更完整的 durable ACK / retry 与恢复元数据；基于 0.4.3 的息屏布局修复签名包已单独完成真机验证。0.4.5 发布后仍需按完整回归清单重新验收，再更新完整真机基线。
+0.4.5 保留 Workout Protocol V1 与 `lianleme.workout.state.v3` 本地状态结构，并完成页面控制器职责拆分：纯训练计算、storage 与 interconnect transport 各自由独立模块负责。此前基于 0.4.3 发现并修复的息屏 / 亮屏训练卡片上移问题已包含在 0.4.5 中，并再次通过正式版本真机验证。0.4.4 未发布，版本直接从 0.4.3 跳到 0.4.5。
 
 当前版本继续使用与 Android `io.github.rogerlang.lianleme` 对齐的包名与签名身份，用于 Xiaomi `system.interconnect` 身份匹配。0.2.5 及更早版本使用 `com.rogerlang.lianleme.vela`，首次迁移到当前包名时需要先卸载旧包。
 
