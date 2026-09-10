@@ -68,6 +68,12 @@ The active workout view keeps an explicit `426px` height matching the screen con
 
 `onHide` and `onDestroy` stop rest/progress timers and save the current state. `onShow` resumes absolute-time rest handling and republishes current progress when connected.
 
+## Device-verified baseline
+
+Vela 0.4.5 / versionCode 18 is the current complete real-device regression baseline on Xiaomi Smart Band 9 Pro (M2401B1), paired with Android 0.8.4 / versionCode 35.
+
+The 2026-09-10 regression validated the refactored runtime/store/transport ownership in the shipped signed RPK and covered active workout interaction, set adjustment, RIR 0–5, rest flow, completion and exit, Android ↔ Vela progress synchronization, disconnect/reconnect recovery, recovery after the phone app process is force-closed, pending-plan handoff, and display sleep/wake layout recovery. No new known functional issues were found in that validation pass.
+
 ## Durability constraints
 
 - wearable local progress is persisted before it is considered recoverable
