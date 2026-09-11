@@ -52,8 +52,9 @@
   width: 300px;
   height: 426px;
   flex-direction: column;
+  justify-content: center;
   align-items: center;
-  padding-top: 24px;
+  padding-top: 0px;
 }
 
 .workout-main {
@@ -66,10 +67,21 @@
   display: none;
 }
 
-.exercise-name {
+.exercise-title-card {
   width: 300px;
-  height: 48px;
-  font-size: 36px;
+  height: 64px;
+  border-radius: 18px;
+  border-width: 1px;
+  border-color: #202731;
+  justify-content: center;
+  align-items: center;
+  background-color: #0a0f15;
+}
+
+.exercise-name {
+  width: 276px;
+  height: 46px;
+  font-size: 34px;
   font-weight: bold;
   text-align: center;
   color: #ffffff;
@@ -79,9 +91,9 @@
 
 .set-card {
   width: 300px;
-  height: 132px;
-  margin-top: 8px;
-  border-radius: 18px;
+  height: 150px;
+  margin-top: 10px;
+  border-radius: 20px;
   border-width: 1px;
   border-color: #262d36;
   flex-direction: column;
@@ -90,11 +102,64 @@
   background-color: #0f141a;
 }
 
-.set-label {
+.set-card-topline {
   width: 272px;
-  font-size: 17px;
+  height: 24px;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.set-label {
+  width: 130px;
+  font-size: 16px;
   text-align: left;
   color: #c0c7d0;
+}
+
+.prescription-row {
+  width: 284px;
+  height: 86px;
+  margin-top: 4px;
+  flex-direction: row;
+  justify-content: center;
+  align-items: center;
+}
+
+.prescription-number {
+  height: 74px;
+  font-size: 60px;
+  font-weight: bold;
+  text-align: center;
+  color: #ffffff;
+}
+
+.prescription-bodyweight {
+  height: 62px;
+  font-size: 48px;
+  font-weight: bold;
+  text-align: center;
+  color: #ffffff;
+}
+
+.prescription-unit {
+  height: 30px;
+  margin-left: 3px;
+  font-size: 20px;
+  font-weight: bold;
+  text-align: center;
+  color: #aeb7c3;
+}
+
+.prescription-separator {
+  width: 32px;
+  height: 42px;
+  margin-left: 9px;
+  margin-right: 9px;
+  font-size: 30px;
+  font-weight: bold;
+  text-align: center;
+  color: #7f8996;
 }
 
 .prescription {
@@ -107,15 +172,15 @@
 }
 
 .rest-hint {
-  width: 272px;
-  margin-top: 2px;
-  font-size: 15px;
-  text-align: left;
+  width: 130px;
+  margin-top: 0px;
+  font-size: 14px;
+  text-align: right;
   color: #aeb7c3;
 }
 
 .workout-action-zone {
-  width: 304px;
+  width: 300px;
   margin-top: 14px;
   flex-direction: column-reverse;
   align-items: center;
@@ -129,8 +194,8 @@
 }
 
 .workout-actions {
-  width: 304px;
-  height: 86px;
+  width: 300px;
+  height: 88px;
 }
 
 .half-action {
@@ -142,8 +207,8 @@
 }
 
 .workout-half-action {
-  width: 148px;
-  height: 86px;
+  width: 144px;
+  height: 88px;
   border-radius: 20px;
 }
 
