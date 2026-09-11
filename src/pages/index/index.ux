@@ -10,12 +10,23 @@
         <div if="{{ !editing }}" class="workout-view">
           <div class="workout-main">
             <text class="workout-context">{{ workoutProgress }}</text>
-            <text class="exercise-name">{{ currentExerciseName }}</text>
+            <div class="exercise-title-card">
+              <text class="exercise-name">{{ currentExerciseName }}</text>
+            </div>
 
             <div class="set-card">
-              <text class="set-label">{{ currentSetLabel }}</text>
-              <text class="prescription">{{ prescription }}</text>
-              <text class="rest-hint">休息 {{ currentRestSeconds }} 秒</text>
+              <div class="set-card-topline">
+                <text class="set-label">{{ currentSetLabel }}</text>
+                <text class="rest-hint">休息 {{ currentRestSeconds }} 秒</text>
+              </div>
+              <div class="prescription-row">
+                <text if="{{ currentWeight === null }}" class="prescription-bodyweight">自重</text>
+                <text else class="prescription-number">{{ currentWeight }}</text>
+                <text if="{{ currentWeight !== null }}" class="prescription-unit">kg</text>
+                <text class="prescription-separator">×</text>
+                <text class="prescription-number">{{ currentReps }}</text>
+                <text class="prescription-unit">次</text>
+              </div>
             </div>
           </div>
 
