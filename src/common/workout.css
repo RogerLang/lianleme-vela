@@ -53,7 +53,7 @@
   height: 426px;
   flex-direction: column;
   align-items: center;
-  padding-top: 32px;
+  padding-top: 24px;
 }
 
 .workout-main {
@@ -68,8 +68,8 @@
 
 .exercise-name {
   width: 300px;
-  height: 54px;
-  font-size: 40px;
+  height: 48px;
+  font-size: 36px;
   font-weight: bold;
   text-align: center;
   color: #ffffff;
@@ -79,8 +79,8 @@
 
 .set-card {
   width: 300px;
-  height: 116px;
-  margin-top: 10px;
+  height: 132px;
+  margin-top: 8px;
   border-radius: 18px;
   border-width: 1px;
   border-color: #262d36;
@@ -98,9 +98,9 @@
 }
 
 .prescription {
-  width: 272px;
-  margin-top: 4px;
-  font-size: 40px;
+  width: 284px;
+  margin-top: 2px;
+  font-size: 52px;
   font-weight: bold;
   text-align: center;
   color: #ffffff;
@@ -108,7 +108,7 @@
 
 .rest-hint {
   width: 272px;
-  margin-top: 6px;
+  margin-top: 2px;
   font-size: 15px;
   text-align: left;
   color: #aeb7c3;
@@ -116,7 +116,7 @@
 
 .workout-action-zone {
   width: 304px;
-  margin-top: 18px;
+  margin-top: 14px;
   flex-direction: column-reverse;
   align-items: center;
 }
