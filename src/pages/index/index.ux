@@ -114,13 +114,14 @@
       </div>
 
       <div elif="{{ screen === 'rest' }}" class="screen rest-screen">
-        <text class="rest-title">休息</text>
+        <text class="rest-title">{{ restRemaining > 0 ? '休息' : '休息已结束' }}</text>
         <text class="countdown">{{ restRemaining }}</text>
-        <text class="seconds">秒</text>
+        <text class="rest-caption">{{ restRemaining > 0 ? '秒' : '可以开始下一组' }}</text>
 
         <div class="rest-adjust-row">
-          <div class="rest-adjust-button" onclick="decreaseRest"><text class="rest-adjust-text">−15 秒</text></div>
-          <div class="rest-adjust-button" onclick="increaseRest"><text class="rest-adjust-text">+15 秒</text></div>
+          <div class="rest-adjust-button" onclick="decreaseRest"><text class="rest-adjust-text">−30 秒</text></div>
+          <div class="rest-adjust-button" onclick="increaseRest"><text class="rest-adjust-text">+30 秒</text></div>
+          <div class="rest-adjust-button" onclick="increaseRestByMinute"><text class="rest-adjust-text">+60 秒</text></div>
         </div>
 
         <div class="next-card">
@@ -133,8 +134,8 @@
           <div class="half-action rest-half-action dark-half-action" onclick="undoLastSet">
             <text class="half-action-text dark-half-action-text">撤销上一组</text>
           </div>
-          <div class="half-action rest-half-action light-half-action" onclick="skipRest">
-            <text class="half-action-text light-half-action-text">跳过休息</text>
+          <div class="half-action rest-half-action light-half-action" onclick="finishRest">
+            <text class="half-action-text light-half-action-text">{{ restRemaining > 0 ? '跳过休息' : '开始下一组' }}</text>
           </div>
         </div>
       </div>
@@ -194,6 +195,7 @@ var TRANSPORT = null
 export default {
   private: {
     ready: false,
+    pageVisible: false,
     screen: 'workout',
     editing: false,
     editOriginalWeight: null,
@@ -219,6 +221,7 @@ export default {
     nextHint: '',
     restRemaining: 0,
     restEndAt: 0,
+    restEndNotified: false,
     nextExerciseName: '',
     nextSetLabel: '',
     nextPrescription: '',
@@ -242,6 +245,7 @@ export default {
   },
 
   onShow() {
+    this.pageVisible = true
     if (!this.ready) {
       return
     }
@@ -250,6 +254,7 @@ export default {
   },
 
   onHide() {
+    this.pageVisible = false
     if (!this.ready) {
       return
     }
@@ -262,6 +267,7 @@ export default {
   },
 
   onDestroy() {
+    this.pageVisible = false
     if (!this.ready) {
       return
     }
@@ -324,6 +330,7 @@ export default {
     this.completedSets = this.completedRecords.length
     this.canUndo = this.completedSets > 0
     this.restEndAt = typeof state.restEndAt === 'number' ? state.restEndAt : 0
+    this.restEndNotified = state.restEndNotified === true
     this.editing = false
     this.editOriginalWeight = null
     this.editOriginalReps = 0
@@ -348,7 +355,6 @@ export default {
         return false
       }
       this.refreshRestPreview()
-      this.syncRestRemaining()
     }
 
     return true
@@ -377,7 +383,7 @@ export default {
   },
 
   resetWorkoutState() {
-    this.stopRestTimer()
+    this.clearRest()
     this.stopProgressRetry()
     this.screen = 'workout'
     this.editing = false
@@ -391,8 +397,6 @@ export default {
     this.completedSets = 0
     this.totalSets = runtime.countSets(WORKOUT)
     this.canUndo = false
-    this.restRemaining = 0
-    this.restEndAt = 0
     this.completionConfirmed = false
     this.completionSynced = false
     this.syncPending = false
@@ -554,14 +558,21 @@ export default {
     var completed = normalized.completed
     var previousCompleted = this.completedRecords.length
     var previousScreen = this.screen
+    var next = runtime.firstIncompleteIndices(WORKOUT, completed)
+    // A phone snapshot with the same set progress should preserve the local rest.
+    var keepRest = previousScreen === 'rest' && progress.status === 'active' && next &&
+      next.exerciseIndex === this.pendingExerciseIndex && next.setIndex === this.pendingSetIndex &&
+      records.length === previousCompleted && this.completedRecords.every(function(record) {
+        return completed[runtime.recordKey(record.exerciseIndex, record.setIndex)]
+      })
 
-    this.stopRestTimer()
+    if (!keepRest) {
+      this.clearRest()
+    }
     this.stopProgressRetry()
     this.completedRecords = records
     this.completedSets = records.length
     this.canUndo = this.completedSets > 0
-    this.restEndAt = 0
-    this.restRemaining = 0
     this.editing = false
     this.editOriginalWeight = null
     this.editOriginalReps = 0
@@ -570,7 +581,6 @@ export default {
     this.lastAckUpdatedAt = this.progressUpdatedAt
     this.syncPending = false
 
-    var next = runtime.firstIncompleteIndices(WORKOUT, completed)
     if (progress.status === 'complete' || !next) {
       this.screen = 'complete'
       this.completionSynced = true
@@ -581,7 +591,7 @@ export default {
       this.pendingExerciseIndex = lastExerciseIndex
       this.pendingSetIndex = lastSetIndex
       this.loadCurrentSet()
-    } else {
+    } else if (!keepRest) {
       this.screen = 'workout'
       this.completionSynced = false
       this.exerciseIndex = next.exerciseIndex
@@ -698,15 +708,9 @@ export default {
   },
 
   resumeFromLifecycle() {
-    if (this.screen !== 'rest') {
-      return
+    if (this.pageVisible && this.screen === 'rest') {
+      this.startRestTimer()
     }
-    this.syncRestRemaining()
-    if (this.restRemaining <= 0) {
-      this.finishRest(true)
-      return
-    }
-    this.startRestTimer()
   },
 
   loadCurrentSet(weightOverride, repsOverride) {
@@ -910,8 +914,8 @@ export default {
   prepareRestScreen() {
     var currentExercise = WORKOUT.exercises[this.exerciseIndex]
     this.restEndAt = runtime.nowMs() + currentExercise.restSeconds * 1000
+    this.restEndNotified = false
     this.refreshRestPreview()
-    this.syncRestRemaining()
   },
 
   refreshRestPreview() {
@@ -923,30 +927,36 @@ export default {
     this.nextPrescription = runtime.formatPrescription(nextSet.weight, nextSet.reps)
   },
 
-  syncRestRemaining() {
-    var remainingMs = this.restEndAt - runtime.nowMs()
-    if (remainingMs <= 0) {
-      this.restRemaining = 0
+  updateRestTimer() {
+    var endAt = this.restEndAt
+    this.restRemaining = this.restEndNotified ? 0 : Math.max(0, Math.ceil((endAt - runtime.nowMs()) / 1000))
+    if (this.restRemaining > 0) {
       return
     }
-    this.restRemaining = Math.ceil(remainingMs / 1000)
+
+    this.stopRestTimer()
+    if (this.restEndNotified) {
+      return
+    }
+
+    this.restEndNotified = true
+    var that = this
+    this.saveState(function() {
+      if (that.screen === 'rest' && that.restEndAt === endAt && that.restEndNotified) {
+        vibrator.vibrate({ mode: 'long' })
+      }
+    })
   },
 
   startRestTimer() {
     this.stopRestTimer()
-    this.syncRestRemaining()
-    if (this.restRemaining <= 0) {
-      this.finishRest(true)
-      return
+    this.updateRestTimer()
+    if (this.restRemaining > 0) {
+      var that = this
+      this.restTimer = setInterval(function() {
+        that.updateRestTimer()
+      }, 1000)
     }
-
-    var that = this
-    this.restTimer = setInterval(function() {
-      that.syncRestRemaining()
-      if (that.restRemaining <= 0) {
-        that.finishRest(true)
-      }
-    }, 1000)
   },
 
   stopRestTimer() {
@@ -956,12 +966,23 @@ export default {
     }
   },
 
+  clearRest() {
+    this.stopRestTimer()
+    this.restEndAt = 0
+    this.restRemaining = 0
+    this.restEndNotified = false
+  },
+
   decreaseRest() {
-    this.adjustRest(-15)
+    this.adjustRest(-30)
   },
 
   increaseRest() {
-    this.adjustRest(15)
+    this.adjustRest(30)
+  },
+
+  increaseRestByMinute() {
+    this.adjustRest(60)
   },
 
   adjustRest(deltaSeconds) {
@@ -969,34 +990,29 @@ export default {
       return
     }
 
-    var minimumEnd = runtime.nowMs() + 5000
-    var nextEnd = this.restEndAt + deltaSeconds * 1000
-    this.restEndAt = nextEnd < minimumEnd ? minimumEnd : nextEnd
-    this.syncRestRemaining()
-    this.saveState()
-  },
-
-  skipRest() {
-    if (this.screen !== 'rest') {
-      return
-    }
-    this.finishRest(false)
-  },
-
-  finishRest(naturalEnd) {
-    if (this.screen !== 'rest') {
+    var now = runtime.nowMs()
+    var baseEnd = this.restEndNotified ? now : Math.max(now, this.restEndAt)
+    if (deltaSeconds < 0 && baseEnd === now) {
+      this.updateRestTimer()
       return
     }
 
-    this.stopRestTimer()
-    if (naturalEnd) {
-      vibrator.vibrate({ mode: 'long' })
+    this.restEndAt = Math.max(now, baseEnd + deltaSeconds * 1000)
+    this.restEndNotified = false
+    this.startRestTimer()
+    if (this.restRemaining > 0) {
+      this.saveState()
+    }
+  },
+
+  finishRest() {
+    if (this.screen !== 'rest') {
+      return
     }
 
+    this.clearRest()
     this.exerciseIndex = this.pendingExerciseIndex
     this.setIndex = this.pendingSetIndex
-    this.restEndAt = 0
-    this.restRemaining = 0
     this.screen = 'workout'
     this.loadCurrentSet()
     this.saveState()
@@ -1007,7 +1023,7 @@ export default {
       return
     }
 
-    this.stopRestTimer()
+    this.clearRest()
     var record = this.completedRecords[this.completedRecords.length - 1]
     this.completedRecords = this.completedRecords.slice(0, this.completedRecords.length - 1)
     this.completedSets = this.completedRecords.length
@@ -1022,8 +1038,6 @@ export default {
     this.setIndex = record.setIndex
     this.pendingExerciseIndex = record.exerciseIndex
     this.pendingSetIndex = record.setIndex
-    this.restEndAt = 0
-    this.restRemaining = 0
     this.loadCurrentSet(record.actualWeight, record.actualReps)
     this.markProgressDirty()
     this.refreshDoneStatus()
@@ -1037,9 +1051,7 @@ export default {
   },
 
   finishWorkout() {
-    this.stopRestTimer()
-    this.restEndAt = 0
-    this.restRemaining = 0
+    this.clearRest()
     this.completionConfirmed = false
     this.completionSynced = false
     this.screen = 'complete'

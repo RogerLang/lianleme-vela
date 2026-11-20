@@ -185,6 +185,7 @@ function stateSnapshot(workout, state, stateVersion) {
     currentReps: state.currentReps,
     completedRecords: state.completedRecords,
     restEndAt: state.restEndAt,
+    restEndNotified: state.restEndNotified === true,
     completionConfirmed: state.completionConfirmed,
     completionSynced: state.completionSynced,
     updatedAt: state.progressUpdatedAt || nowMs(),

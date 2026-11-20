@@ -437,7 +437,6 @@
 }
 
 .rest-screen {
-  position: relative;
   justify-content: flex-start;
   padding-top: 4px;
 }
@@ -453,22 +452,18 @@
 
 .countdown {
   width: 300px;
-  height: 96px;
-  margin-top: 0px;
-  font-size: 82px;
+  height: 82px;
+  font-size: 68px;
   font-weight: bold;
   text-align: center;
   color: #ffffff;
 }
 
-.seconds {
-  position: absolute;
-  left: 208px;
-  top: 111px;
-  width: 26px;
-  height: 20px;
-  font-size: 15px;
-  text-align: left;
+.rest-caption {
+  width: 300px;
+  height: 24px;
+  font-size: 18px;
+  text-align: center;
   color: #9ba5b3;
 }
 
@@ -482,7 +477,7 @@
 }
 
 .rest-adjust-button {
-  width: 144px;
+  width: 94px;
   height: 66px;
   border-radius: 18px;
   border-width: 1px;
@@ -493,7 +488,7 @@
 }
 
 .rest-adjust-text {
-  width: 130px;
+  width: 90px;
   font-size: 19px;
   font-weight: bold;
   text-align: center;
@@ -501,9 +496,8 @@
 }
 
 .next-card {
-  position: relative;
   width: 300px;
-  height: 112px;
+  height: 100px;
   margin-top: 12px;
   border-radius: 18px;
   border-width: 1px;
@@ -515,19 +509,16 @@
 }
 
 .next-eyebrow {
-  position: absolute;
-  left: 16px;
-  top: 11px;
-  width: 268px;
+  width: 270px;
   font-size: 15px;
-  text-align: left;
+  text-align: center;
   color: #aeb7c3;
 }
 
 .next-name {
   width: 270px;
-  margin-top: 8px;
-  font-size: 30px;
+  margin-top: 4px;
+  font-size: 28px;
   font-weight: bold;
   text-align: center;
   color: #ffffff;
@@ -537,7 +528,7 @@
 
 .next-meta {
   width: 270px;
-  margin-top: 6px;
+  margin-top: 4px;
   font-size: 16px;
   text-align: center;
   color: #c0c7d0;
@@ -545,7 +536,7 @@
 
 .rest-actions {
   height: 76px;
-  margin-top: 14px;
+  margin-top: 12px;
 }
 
 .rest-half-action {
