@@ -222,6 +222,9 @@ export default {
     restRemaining: 0,
     restEndAt: 0,
     restEndNotified: false,
+    restAlertRevision: 0,
+    restAlertSentAt: 0,
+    phoneAlertRevision: 0,
     nextExerciseName: '',
     nextSetLabel: '',
     nextPrescription: '',
@@ -263,6 +266,7 @@ export default {
     }
     this.stopRestTimer()
     this.stopProgressRetry()
+    this.syncRestAlert()
     this.saveState()
   },
 
@@ -276,6 +280,7 @@ export default {
     }
     this.stopRestTimer()
     this.stopProgressRetry()
+    this.syncRestAlert()
     this.saveState()
   },
 
@@ -331,6 +336,9 @@ export default {
     this.canUndo = this.completedSets > 0
     this.restEndAt = typeof state.restEndAt === 'number' ? state.restEndAt : 0
     this.restEndNotified = state.restEndNotified === true
+    this.restAlertRevision = Number(state.restAlertRevision) ||
+      (this.restEndAt > 0 ? runtime.nowMs() : 0)
+    this.phoneAlertRevision = Number(state.phoneAlertRevision) || 0
     this.editing = false
     this.editOriginalWeight = null
     this.editOriginalReps = 0
@@ -384,6 +392,8 @@ export default {
 
   resetWorkoutState() {
     this.clearRest()
+    this.restAlertRevision = 0
+    this.phoneAlertRevision = 0
     this.stopProgressRetry()
     this.screen = 'workout'
     this.editing = false
@@ -463,6 +473,36 @@ export default {
       revision: String(WORKOUT.revision || '')
     })
     this.publishProgress()
+    this.syncRestAlert()
+  },
+
+  advanceRestAlert() {
+    this.restAlertRevision = Math.max(runtime.nowMs(), this.restAlertRevision + 1)
+    this.phoneAlertRevision = 0
+  },
+
+  syncRestAlert(requestId, canceled) {
+    if (!WORKOUT.id || !WORKOUT.revision || !this.connectionReady) {
+      return
+    }
+    var now = runtime.nowMs()
+    this.restAlertSentAt = Math.max(now, this.restAlertSentAt + 1)
+    var active = !canceled && this.screen === 'rest' && !this.restEndNotified
+    this.sendEnvelope('rest-state', {
+      workoutId: String(WORKOUT.id),
+      revision: String(WORKOUT.revision),
+      planId: String(WORKOUT.planId || ''),
+      exerciseIndex: this.exerciseIndex,
+      exerciseId: WORKOUT.exercises[this.exerciseIndex].exerciseId,
+      setIndex: this.setIndex,
+      deadlineAt: this.restEndAt,
+      restRevision: this.restAlertRevision,
+      sentAt: this.restAlertSentAt,
+      state: active ? 'resting' : (canceled ? 'canceled' : 'idle'),
+      trainingActive: this.hasActiveLocalSession(),
+      visible: this.pageVisible,
+      requestId: requestId || ''
+    })
   },
 
   stopProgressRetry() {
@@ -502,6 +542,21 @@ export default {
   handleIncomingMessage(raw) {
     var message = protocol.decode(raw)
     if (!message) {
+      return
+    }
+    if (message.type === 'rest-sync') {
+      this.syncRestAlert(message.id)
+      return
+    }
+    if (message.type === 'rest-fired') {
+      var alert = message.payload || {}
+      if (protocol.progressMatchesPlan(alert, WORKOUT) &&
+          alert.exerciseIndex === this.exerciseIndex && alert.setIndex === this.setIndex &&
+          alert.restRevision === this.restAlertRevision && alert.deadlineAt === this.restEndAt &&
+          this.phoneAlertRevision !== alert.restRevision) {
+        this.phoneAlertRevision = alert.restRevision
+        this.saveState()
+      }
       return
     }
     if (message.type === 'plan') {
@@ -603,6 +658,7 @@ export default {
 
     this.refreshDoneStatus()
     if (this.completedRecords.length !== previousCompleted || this.screen !== previousScreen) {
+      this.syncRestAlert()
       vibrator.vibrate({ mode: 'short' })
     }
     var that = this
@@ -639,6 +695,7 @@ export default {
   installIncomingPlan(plan, replyTo) {
     this.pendingPlan = null
     this.pendingPlanReplyTo = ''
+    this.clearRest()
     WORKOUT = plan
     this.totalSets = runtime.countSets(WORKOUT)
     this.resetWorkoutState()
@@ -839,6 +896,7 @@ export default {
 
     if (!exercise.warmup) {
       this.screen = 'rir'
+      this.syncRestAlert()
       this.saveState()
       vibrator.vibrate({ mode: 'short' })
       return
@@ -902,6 +960,8 @@ export default {
     this.pendingSetIndex = next.setIndex
     this.prepareRestScreen()
     this.screen = 'rest'
+    this.advanceRestAlert()
+    this.syncRestAlert()
     var that = this
     this.saveState(function(saved) {
       if (saved) {
@@ -940,9 +1000,11 @@ export default {
     }
 
     this.restEndNotified = true
+    this.syncRestAlert(undefined, true)
     var that = this
     this.saveState(function() {
-      if (that.screen === 'rest' && that.restEndAt === endAt && that.restEndNotified) {
+      if (that.screen === 'rest' && that.restEndAt === endAt && that.restEndNotified &&
+          that.phoneAlertRevision !== that.restAlertRevision) {
         vibrator.vibrate({ mode: 'long' })
       }
     })
@@ -968,6 +1030,10 @@ export default {
 
   clearRest() {
     this.stopRestTimer()
+    if (this.restEndAt > 0) {
+      this.advanceRestAlert()
+      this.syncRestAlert(undefined, true)
+    }
     this.restEndAt = 0
     this.restRemaining = 0
     this.restEndNotified = false
@@ -999,6 +1065,8 @@ export default {
 
     this.restEndAt = Math.max(now, baseEnd + deltaSeconds * 1000)
     this.restEndNotified = false
+    this.advanceRestAlert()
+    this.syncRestAlert()
     this.startRestTimer()
     if (this.restRemaining > 0) {
       this.saveState()
@@ -1040,6 +1108,7 @@ export default {
     this.pendingSetIndex = record.setIndex
     this.loadCurrentSet(record.actualWeight, record.actualReps)
     this.markProgressDirty()
+    this.syncRestAlert()
     this.refreshDoneStatus()
     vibrator.vibrate({ mode: 'short' })
     var that = this
@@ -1055,6 +1124,7 @@ export default {
     this.completionConfirmed = false
     this.completionSynced = false
     this.screen = 'complete'
+    this.syncRestAlert(undefined, true)
     this.refreshDoneStatus()
     var that = this
     this.saveState(function(saved) {

@@ -161,6 +161,14 @@ General acknowledgement for plan or control messages. Plan delivery uses the fol
 
 `status` is `accepted` or `deferred`. A deferred acknowledgement may use `reason: "active-session"` when the previous workout is still being performed, or `reason: "sync-pending"` when previous local progress still needs acknowledgement. Older clients that omit `status` are interpreted as accepted for compatibility.
 
+### Optional rest alert messages
+
+- `rest-state` carries the current timer to Android on entry, adjustment, cancellation, visibility changes, and reconnect. The payload includes the workout identity, zero-based completed exercise and set indices, the exercise ID, the Band's `deadlineAt` and `sentAt` in milliseconds, a persisted `restRevision`, the timer state (`resting`, `canceled`, or `idle`), and the visibility and active-training flags. The envelope `id` identifies a particular event. A timer change advances its revision. Visibility changes and resync preserve the timer revision.
+- Android sends `rest-sync` with an empty payload. The Band returns its current `rest-state` with `requestId` equal to the request's envelope ID. Android uses the short round trip to map Band timestamps to the phone's monotonic clock.
+- Android sends `rest-fired` after it posts the phone notification. The Band matches the workout identity, exercise and set, deadline, and timer revision before suppressing that timer's local end vibration.
+
+All three messages use the existing interconnect and leave the V1 progress snapshot format unchanged. The Band retains its local timer and recovery. Notification delivery and local vibration can overlap during a connection or visibility change.
+
 ## Conflict model
 
 V1 uses `workoutId + revision + planId` as the full workout identity. `updatedAt` orders snapshots emitted by one device for the same workout identity, while ACK matching also requires all three identity fields.
