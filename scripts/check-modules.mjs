@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import path from 'node:path'
+import { runInNewContext } from 'node:vm'
 
 const root = process.cwd()
 
@@ -11,6 +12,7 @@ async function importSource(relativePath) {
 }
 
 const runtime = await importSource('src/common/workout-runtime.js')
+const protocol = await importSource('src/common/workout-protocol.js')
 const storeFactory = await importSource('src/common/workout-store.js')
 const transportFactory = await importSource('src/common/workout-transport.js')
 
@@ -144,5 +146,123 @@ assert.equal(rawMessage, 'payload')
 fakeConn.onclose()
 assert.equal(transport.isReady(), false)
 assert.equal(transport.send('hello', {}), false)
+
+const restPlan = {
+  ...workingPlan,
+  exercises: [
+    { ...workingPlan.exercises[0], restSeconds: 90 },
+    { exerciseId: 'row', name: '单臂划船', sets: [{ weight: 20, reps: 10 }, { weight: 20, reps: 10 }] }
+  ]
+}
+storageData.set('lianleme.workout.plan.v1', JSON.stringify(restPlan))
+const restStateKey = 'lianleme.workout.state.v3'
+const pageScript = fs.readFileSync(path.join(root, 'src/pages/index/index.ux'), 'utf8')
+  .match(/<script>([\s\S]*?)<\/script>/)[1]
+  .replace(/^import .*$/gm, '')
+  .replace('export default', 'page =')
+let now = 1000000
+let restVibrations = 0
+let tickRest
+function openPage(connection, messages) {
+  const globals = {
+    runtime: { ...runtime, nowMs: () => now },
+    storage: fakeStorage,
+    storeFactory,
+    transportFactory,
+    protocol,
+    interconnect: { instance: () => connection },
+    vibrator: { vibrate: ({ mode }) => { if (mode === 'long') restVibrations++ } },
+    setInterval: callback => { tickRest = callback; return 1 },
+    clearInterval: () => { tickRest = null },
+    setTimeout: () => 1,
+    clearTimeout: () => {}
+  }
+  connection.getReadyState = ({ success }) => success({ status: 0 })
+  connection.send = ({ data }) => messages.push(protocol.decode(data))
+  runInNewContext(pageScript, globals)
+  const page = Object.assign(globals.page, globals.page.private)
+  page.onShow()
+  page.onInit()
+  return page
+}
+
+const messages = []
+const connection = {}
+let page = openPage(connection, messages)
+page.finishCurrentSet(2)
+assert.equal(page.restRemaining, 90)
+assert.equal(page.nextExerciseName, '单臂划船')
+page.decreaseRest()
+assert.equal(page.restRemaining, 60)
+now += 60000
+tickRest()
+assert.equal(page.restRemaining, 0)
+assert.equal(page.screen, 'rest')
+assert.equal(page.exerciseIndex, 0)
+assert.equal(tickRest, null)
+assert.equal(restVibrations, 1)
+assert.equal(JSON.parse(storageData.get(restStateKey)).restEndNotified, true)
+
+page.onHide()
+page.onShow()
+page.onDestroy()
+now += 45000
+page = openPage(connection, messages)
+assert.equal(restVibrations, 1)
+assert.equal(page.restRemaining, 0)
+page.increaseRest()
+assert.equal(page.restEndAt, now + 30000)
+assert.equal(page.restRemaining, 30)
+
+page.onHide()
+now += 10000
+page.onShow()
+assert.equal(page.restRemaining, 20)
+page.increaseRestByMinute()
+assert.equal(page.restRemaining, 80)
+page.onDestroy()
+
+const legacyRest = JSON.parse(storageData.get(restStateKey))
+delete legacyRest.restEndNotified
+storageData.set(restStateKey, JSON.stringify(legacyRest))
+now = legacyRest.restEndAt + 5000
+page = openPage(connection, messages)
+assert.equal(page.screen, 'rest')
+assert.equal(page.restRemaining, 0)
+assert.equal(restVibrations, 2)
+page.increaseRestByMinute()
+assert.equal(page.restEndAt, now + 60000)
+
+connection.onopen()
+const progress = messages.find(message => message.type === 'progress').payload
+assert.equal(Object.hasOwn(progress, 'restEndNotified'), false)
+page.applyProgressAck(progress)
+page.applyIncomingProgress({
+  ...progress,
+  screen: 'workout',
+  restEndAt: 0,
+  completedRecords: progress.completedRecords.map(record => ({ ...record, completedAt: 0 }))
+})
+assert.equal(page.screen, 'rest')
+assert.equal(page.restRemaining, 60)
+assert.equal(messages.at(-1).type, 'progress-ack')
+page.decreaseRest()
+page.decreaseRest()
+page.decreaseRest()
+assert.equal(page.screen, 'rest')
+assert.equal(page.restRemaining, 0)
+assert.equal(restVibrations, 3)
+page.finishRest()
+assert.equal(page.screen, 'workout')
+assert.equal(page.exerciseIndex, 1)
+assert.equal(page.currentRestSeconds, 60)
+
+page.finishCurrentSet(2)
+assert.equal(page.restRemaining, 60)
+page.undoLastSet()
+assert.equal(page.screen, 'workout')
+assert.equal(page.completedRecords.length, 1)
+assert.equal(tickRest, null)
+assert.equal(JSON.parse(storageData.get(restStateKey)).restEndNotified, false)
 
 console.log('vela-modules-check: all checks passed')
